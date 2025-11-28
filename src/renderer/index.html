@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- CSP stricte : pas de CDN externe nécessaire -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file:;">
+  <title>PDF Viewer</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="libs/pdf_viewer.css">
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Chargement des bibliothèques UMD depuis libs/ (compatibilité asar) -->
+  
+  <!-- 1. React et ReactDOM (UMD - exposent window.React et window.ReactDOM) -->
+  <!-- Note: Le chemin change selon le mode dev/prod (géré par le script de copie) -->
+  <script src="./libs/react.development.js"></script>
+  <script src="./libs/react-dom.development.js"></script>
+  
+  <!-- 2. PDF.js en module ES -->
+  <script type="module">
+    import * as pdfjsLib from './libs/pdf.mjs';
+    
+    // Configurer le worker PDF.js avec le bon chemin
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './libs/pdf.worker.mjs';
+    
+    // Exposer pdfjsLib globalement pour les composants
+    window.pdfjsLib = pdfjsLib;
+    
+    // Vérifier que React et ReactDOM sont chargés
+    if (!window.React || !window.ReactDOM) {
+      console.error('React ou ReactDOM non chargés!');
+      document.getElementById('root').innerHTML = 
+        '<div style="color: red; padding: 20px; font-family: sans-serif;">' +
+        'Erreur critique: React non chargé. Vérifiez que les fichiers dans libs/ existent.' +
+        '</div>';
+      throw new Error('React dependencies missing');
+    }
+    
+    // Fonction utilitaire pour charger un script de manière séquentielle
+    const loadScript = (src) => {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => {
+          console.log(`✓ Chargé: ${src}`);
+          resolve();
+        };
+        script.onerror = () => {
+          console.error(`✗ Échec: ${src}`);
+          reject(new Error(`Failed to load script: ${src}`));
+        };
+        document.body.appendChild(script);
+      });
+    };
+
+    // Chargement séquentiel des composants React avec gestion d'erreurs
+    (async () => {
+      try {
+        console.log('🚀 Démarrage du chargement des composants...');
+        
+        await loadScript('components/BookmarkList.js');
+        await loadScript('components/HomeScreen.js');
+        await loadScript('components/PdfViewer.js');
+        await loadScript('App.js');
+        
+        console.log('✅ Application chargée avec succès');
+      } catch (error) {
+        console.error('❌ Erreur de chargement des composants:', error);
+        document.getElementById('root').innerHTML = 
+          '<div style="color: red; padding: 20px; font-family: sans-serif;">' +
+          '<h2>Erreur de chargement de l\'application</h2>' +
+          '<p>Détails: ' + error.message + '</p>' +
+          '<p>Vérifiez la console pour plus d\'informations.</p>' +
+          '</div>';
+      }
+    })();
+  </script>
+</body>
+</html>

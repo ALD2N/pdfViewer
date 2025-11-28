@@ -1,0 +1,612 @@
+/**
+ * PdfViewer.js - Composant de visualisation PDF avec bookmarks
+ * Utilise PDF.js pour le rendu, supporte zoom, navigation et bookmarks
+ */
+
+(function() {
+  const { useState, useRef, useEffect, useCallback } = React;
+
+  function PdfViewer({ pdfData, onGoHome }) {
+    // Refs pour le rendu
+    const canvasRef = useRef(null);
+    const containerRef = useRef(null);
+    const viewerContentRef = useRef(null);
+    const [viewerContentEl, setViewerContentEl] = useState(null);
+    
+    // États UI
+    const [numPages, setNumPages] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [zoom, setZoom] = useState(1.0);
+    const [isLoading, setIsLoading] = useState(true);
+    
+    // États bookmarks
+    const [bookmarks, setBookmarks] = useState(pdfData.bookmarks || []);
+    const [previewBookmark, setPreviewBookmark] = useState(null);
+    const [isAddingBookmark, setIsAddingBookmark] = useState(false);
+    
+    // Refs pour la gestion des rendus (mutex/queue system)
+    const pdfDocumentRef = useRef(null);
+    const renderTaskRef = useRef(null);
+    const isRenderingRef = useRef(false);
+    const renderQueueRef = useRef([]);
+    const isMountedRef = useRef(true);
+    const viewStateRef = useRef({ page: 1, zoom: 1 });
+
+    const attachViewerContentRef = useCallback((node) => {
+      viewerContentRef.current = node;
+      setViewerContentEl(node);
+    }, []);
+
+    // Accès à PDF.js depuis window
+    const pdfjsLib = window.pdfjsLib;
+
+    // Fonction pour annuler le rendu en cours
+    const cancelCurrentRender = useCallback(() => {
+      if (renderTaskRef.current) {
+        try {
+          renderTaskRef.current.cancel();
+        } catch (e) {
+          console.warn('Erreur annulation rendu:', e);
+        }
+        renderTaskRef.current = null;
+      }
+    }, []);
+
+    // Fonction de rendu de page avec gestion des erreurs
+    const computeFitScale = useCallback((baseViewport) => {
+      const contentElement = viewerContentRef.current;
+      if (!contentElement) return 1;
+
+      const styles = window.getComputedStyle(contentElement);
+      const paddingX = parseFloat(styles.paddingLeft || '0') + parseFloat(styles.paddingRight || '0');
+      const paddingY = parseFloat(styles.paddingTop || '0') + parseFloat(styles.paddingBottom || '0');
+
+      const availableWidth = Math.max(contentElement.clientWidth - paddingX, 50);
+      const availableHeight = Math.max(contentElement.clientHeight - paddingY, 50);
+
+      const widthRatio = availableWidth / baseViewport.width;
+      const heightRatio = availableHeight / baseViewport.height;
+      const fitScale = Math.min(widthRatio, heightRatio);
+
+      if (!isFinite(fitScale) || fitScale <= 0) {
+        return 1;
+      }
+      return fitScale;
+    }, []);
+
+    const renderPage = useCallback(async (pageNum, scale = zoom) => {
+      if (!pdfDocumentRef.current || !canvasRef.current || !isMountedRef.current) return;
+
+      cancelCurrentRender();
+
+      try {
+        const page = await pdfDocumentRef.current.getPage(pageNum);
+        const baseViewport = page.getViewport({ scale: 1 });
+        const fitScale = computeFitScale(baseViewport);
+        const targetScale = Math.max(0.1, fitScale * scale);
+        const viewport = page.getViewport({ scale: targetScale });
+
+        const canvas = canvasRef.current;
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport,
+        };
+
+        renderTaskRef.current = page.render(renderContext);
+        await renderTaskRef.current.promise;
+
+      } catch (error) {
+        if (error.name === 'RenderingCancelledException') {
+          console.log('Rendu annulé (navigation rapide)');
+        } else {
+          console.error('Erreur rendu page:', error);
+        }
+      }
+    }, [zoom, cancelCurrentRender, computeFitScale]);
+
+    // Fonction pour traiter la file d'attente des rendus
+    const processRenderQueue = useCallback(async () => {
+      if (isRenderingRef.current || renderQueueRef.current.length === 0 || !isMountedRef.current) {
+        return;
+      }
+
+      isRenderingRef.current = true;
+      const { pageNum, scale, resolve } = renderQueueRef.current.shift();
+
+      try {
+        await renderPage(pageNum, scale);
+        resolve();
+      } catch (error) {
+        console.error('Erreur lors du rendu de la page:', error);
+        resolve();
+      } finally {
+        isRenderingRef.current = false;
+        setTimeout(processRenderQueue, 0);
+      }
+    }, [renderPage]);
+
+    // Fonction pour ajouter une tâche de rendu à la file
+    const queueRender = useCallback((pageNum, scale) => {
+      return new Promise((resolve) => {
+        renderQueueRef.current.push({ pageNum, scale, resolve });
+        processRenderQueue();
+      });
+    }, [processRenderQueue]);
+
+    // Fonction pour générer une miniature et la sauvegarder sur disque
+    // INV-03: Miniatures générées uniquement pour pages bookmarkées
+    const generateAndSaveThumbnail = useCallback(async (pageNum) => {
+      if (!pdfDocumentRef.current) return null;
+
+      try {
+        const page = await pdfDocumentRef.current.getPage(pageNum);
+        const baseViewport = page.getViewport({ scale: 1 });
+
+        // Calculer un scale HD (jusqu'à 2K) en tenant compte du devicePixelRatio
+        const dpr = (window.devicePixelRatio || 1) * 1.5;
+        const TARGET_WIDTH = 2000 * dpr;
+        const TARGET_HEIGHT = 2400 * dpr;
+        const scale = Math.min(
+          TARGET_WIDTH / baseViewport.width,
+          TARGET_HEIGHT / baseViewport.height
+        );
+        const viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+
+        const renderContext = {
+          canvasContext: context,
+          viewport,
+        };
+
+        await page.render(renderContext).promise;
+
+        // Convertir en data URL pour envoi au main process
+        const imageData = canvas.toDataURL('image/png');
+        
+        // Sauvegarder via l'API Electron qui retournera le chemin du fichier
+        const result = await window.electronAPI.generateThumbnail(
+          pdfData.path,
+          pageNum,
+          imageData
+        );
+        
+        if (result.success) {
+          return result.thumbnailPath;
+        } else {
+          console.error('Erreur sauvegarde miniature:', result.error);
+          return null;
+        }
+      } catch (error) {
+        console.error('Erreur génération miniature:', error);
+        return null;
+      }
+    }, [pdfData?.path]);
+
+    // Callback pour ajouter un bookmark
+    // R2: Miniature obligatoire
+    // R3: Persistance automatique
+    // INV-02: Titre non-vide (défaut "Page X")
+    const handleAddBookmark = useCallback(async () => {
+      // Validation: page valide et PDF chargé
+      if (isAddingBookmark || !pdfDocumentRef.current || !currentPage || currentPage < 1 || currentPage > numPages) {
+        console.warn('Impossible d\'ajouter un bookmark : PDF non chargé ou page invalide.');
+        return;
+      }
+
+      setIsAddingBookmark(true);
+      
+      try {
+        // 1. Ajouter le bookmark immédiatement avec titre par défaut
+        const title = `Page ${currentPage}`;
+        const addResult = await window.electronAPI.addBookmark(pdfData.path, currentPage, title);
+        
+        if (!addResult.success) {
+          console.error(addResult.error || 'Erreur ajout bookmark');
+          setIsAddingBookmark(false);
+          return;
+        }
+        
+        // 2. Mettre à jour l'état local immédiatement
+        setBookmarks(addResult.bookmarks);
+        
+        // 3. Générer la miniature de manière asynchrone
+        // R2: Miniature obligatoire - on la génère après l'ajout
+        const thumbnailPath = await generateAndSaveThumbnail(currentPage);
+        
+        if (thumbnailPath) {
+          // 4. Mettre à jour le bookmark avec le chemin de la miniature
+          const updateResult = await window.electronAPI.updateBookmark(
+            pdfData.path,
+            addResult.bookmark.id,
+            { thumbnailPath }
+          );
+          
+          if (updateResult.success) {
+            setBookmarks(updateResult.bookmarks);
+          }
+        } else {
+          console.warn('Bookmark ajouté mais miniature non générée');
+        }
+        
+      } catch (error) {
+        console.error('Erreur ajout bookmark:', error);
+      } finally {
+        setIsAddingBookmark(false);
+      }
+    }, [currentPage, numPages, pdfData.path, generateAndSaveThumbnail, isAddingBookmark]);
+
+    // Callback pour naviguer vers un bookmark
+    const handleNavigateToBookmark = useCallback((bookmark) => {
+      if (bookmark.page >= 1 && bookmark.page <= numPages) {
+        setCurrentPage(bookmark.page);
+      } else {
+        console.warn('Page invalide pour le bookmark sélectionné');
+      }
+    }, [numPages]);
+
+    // Callback pour preview un bookmark
+    const handlePreviewBookmark = useCallback((bookmark) => {
+      setPreviewBookmark(bookmark);
+    }, []);
+
+    // Callback pour fermer la preview
+    const handleClosePreview = useCallback(() => {
+      setPreviewBookmark(null);
+    }, []);
+
+    // Callback pour mettre à jour un bookmark
+    // INV-02: Titre non-vide
+    const handleUpdateBookmark = useCallback(async (bookmarkId, updates) => {
+      try {
+        // Validation côté client pour INV-02
+        if (updates.title !== undefined && (!updates.title || !updates.title.trim())) {
+          console.warn('Le titre du bookmark ne peut pas être vide');
+          return;
+        }
+        
+        const result = await window.electronAPI.updateBookmark(pdfData.path, bookmarkId, updates);
+        if (result.success) {
+          setBookmarks(result.bookmarks);
+        } else {
+          console.error(result.error || 'Erreur mise à jour bookmark');
+        }
+      } catch (error) {
+        console.error('Erreur mise à jour bookmark:', error);
+      }
+    }, [pdfData.path]);
+
+    // Callback pour supprimer un bookmark
+    const handleDeleteBookmark = useCallback(async (bookmarkId) => {
+      if (!confirm('Supprimer ce bookmark ?')) return;
+      
+      try {
+        const result = await window.electronAPI.deleteBookmark(pdfData.path, bookmarkId);
+        if (result.success) {
+          setBookmarks(result.bookmarks);
+        } else {
+          console.error(result.error || 'Erreur suppression bookmark');
+        }
+      } catch (error) {
+        console.error('Erreur suppression bookmark:', error);
+      }
+    }, [pdfData.path]);
+
+    // Callback pour réorganiser les bookmarks
+    // R6: Ordre réorganisable par l'utilisateur
+    const handleReorderBookmarks = useCallback(async (bookmarkIds) => {
+      try {
+        const result = await window.electronAPI.reorderBookmarks(pdfData.path, bookmarkIds);
+        if (result.success) {
+          setBookmarks(result.bookmarks);
+        } else {
+          console.error(result.error || 'Erreur réorganisation bookmarks');
+        }
+      } catch (error) {
+        console.error('Erreur réorganisation bookmarks:', error);
+      }
+    }, [pdfData.path]);
+
+    // Fonction de chargement du PDF
+    const loadPdf = useCallback(async () => {
+      if (!pdfData || !isMountedRef.current) return;
+
+      try {
+        setIsLoading(true);
+        
+        const pdfDataUint8 = new Uint8Array(pdfData.data);
+        const loadingTask = pdfjsLib.getDocument({ data: pdfDataUint8 });
+        const pdf = await loadingTask.promise;
+        
+        if (!isMountedRef.current) return;
+        
+        pdfDocumentRef.current = pdf;
+        setNumPages(pdf.numPages);
+        setCurrentPage(1);
+        
+        // Charger les bookmarks depuis pdfData
+        setBookmarks(pdfData.bookmarks || []);
+        
+        await queueRender(1, zoom);
+        setIsLoading(false);
+      } catch (err) {
+        if (!isMountedRef.current) return;
+        console.error('Erreur chargement PDF:', err);
+        setIsLoading(false);
+      }
+    }, [pdfData, zoom, queueRender, pdfjsLib]);
+
+    // Effet pour charger le PDF au montage
+    useEffect(() => {
+      if (pdfData) {
+        loadPdf();
+      }
+      
+      return () => {
+        cancelCurrentRender();
+        if (pdfDocumentRef.current) {
+          pdfDocumentRef.current.destroy();
+          pdfDocumentRef.current = null;
+        }
+      };
+    }, [pdfData, loadPdf, cancelCurrentRender]);
+
+    // Effet pour gérer le changement de page ou de zoom
+    useEffect(() => {
+      if (pdfDocumentRef.current && currentPage >= 1 && currentPage <= numPages) {
+        queueRender(currentPage, zoom);
+      }
+    }, [currentPage, zoom, numPages, queueRender]);
+
+    useEffect(() => {
+      viewStateRef.current = { page: currentPage, zoom };
+    }, [currentPage, zoom]);
+
+    // Effet pour gérer le cycle de vie du composant
+    useEffect(() => {
+      isMountedRef.current = true;
+      return () => {
+        isMountedRef.current = false;
+        cancelCurrentRender();
+      };
+    }, [cancelCurrentRender]);
+
+    useEffect(() => {
+      if (typeof ResizeObserver === 'undefined') {
+        const handleResize = () => {
+          if (!pdfDocumentRef.current) return;
+          const { page, zoom: zoomLevel } = viewStateRef.current;
+          queueRender(page, zoomLevel);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+      }
+
+      const contentEl = viewerContentRef.current;
+      if (!contentEl) return undefined;
+
+      const observer = new ResizeObserver(() => {
+        if (!pdfDocumentRef.current) return;
+        const { page, zoom: zoomLevel } = viewStateRef.current;
+        queueRender(page, zoomLevel);
+      });
+
+      observer.observe(contentEl);
+      return () => observer.disconnect();
+    }, [queueRender, viewerContentEl]);
+
+    // === RACCOURCIS CLAVIER ===
+    useEffect(() => {
+      const handleKeyDown = (event) => {
+        // Ignorer si on est dans un input
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+          return;
+        }
+
+        if (event.ctrlKey || event.metaKey) {
+          switch (event.key) {
+            case '=':
+            case '+':
+              event.preventDefault();
+              setZoom(prev => Math.min(prev + 0.1, 3.0));
+              break;
+            case '-':
+              event.preventDefault();
+              setZoom(prev => Math.max(prev - 0.1, 0.5));
+              break;
+            case 'b':
+              event.preventDefault();
+              handleAddBookmark();
+              break;
+            case 'h':
+              event.preventDefault();
+              onGoHome();
+              break;
+            default:
+              break;
+          }
+        } else {
+          switch (event.key) {
+            case 'ArrowLeft':
+              event.preventDefault();
+              if (currentPage > 1) setCurrentPage(prev => prev - 1);
+              break;
+            case 'ArrowRight':
+              event.preventDefault();
+              if (currentPage < numPages) setCurrentPage(prev => prev + 1);
+              break;
+            case 'Home':
+              event.preventDefault();
+              setCurrentPage(1);
+              break;
+            case 'End':
+              event.preventDefault();
+              setCurrentPage(numPages);
+              break;
+            case 'Escape':
+              event.preventDefault();
+              if (previewBookmark) {
+                handleClosePreview();
+              }
+              break;
+            default:
+              break;
+          }
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [currentPage, numPages, onGoHome, handleAddBookmark, previewBookmark, handleClosePreview]);
+
+    // === RENDU ===
+    return React.createElement('div', { className: 'pdf-viewer', ref: containerRef },
+      // Header (toolbar)
+      React.createElement('div', { className: 'viewer-header' },
+        React.createElement('div', { className: 'viewer-nav' },
+          React.createElement('button', {
+            className: 'btn-secondary back-btn',
+            onClick: onGoHome,
+            title: 'Retour à l\'accueil (Ctrl+H)'
+          }, '🏠 Accueil'),
+          React.createElement('button', {
+            className: 'btn-icon',
+            onClick: () => setCurrentPage(prev => Math.max(prev - 1, 1)),
+            disabled: currentPage === 1,
+            title: 'Page précédente (←)'
+          }, '◀'),
+          React.createElement('div', { className: 'page-indicator' },
+            React.createElement('span', { className: 'page-info' }, `Page ${currentPage} / ${numPages}`),
+            React.createElement('input', {
+              type: 'number',
+              min: 1,
+              max: numPages,
+              value: currentPage,
+              onChange: (e) => {
+                const page = parseInt(e.target.value, 10);
+                if (page >= 1 && page <= numPages) {
+                  setCurrentPage(page);
+                }
+              },
+              className: 'page-input',
+              title: 'Aller à la page'
+            })
+          ),
+          React.createElement('button', {
+            className: 'btn-icon',
+            onClick: () => setCurrentPage(prev => Math.min(prev + 1, numPages)),
+            disabled: currentPage === numPages,
+            title: 'Page suivante (→)'
+          }, '▶')
+        ),
+        React.createElement('div', { className: 'viewer-actions' },
+          React.createElement('button', {
+            className: 'btn-primary',
+            onClick: handleAddBookmark,
+            disabled: isAddingBookmark,
+            title: 'Ajouter un bookmark (Ctrl+B)'
+          }, isAddingBookmark ? '⏳ Ajout...' : '🔖 Bookmark')
+        ),
+        React.createElement('div', { className: 'viewer-zoom' },
+          React.createElement('button', {
+            className: 'btn-icon',
+            onClick: () => setZoom(prev => Math.max(prev - 0.1, 0.5)),
+            title: 'Zoom arrière (Ctrl+-)'
+          }, '➖'),
+          React.createElement('span', { className: 'zoom-percent' }, `${Math.round(zoom * 100)}%`),
+          React.createElement('button', {
+            className: 'btn-icon',
+            onClick: () => setZoom(prev => Math.min(prev + 0.1, 3.0)),
+            title: 'Zoom avant (Ctrl++)'
+          }, '➕'),
+          React.createElement('button', {
+            className: 'btn-secondary btn-small',
+            onClick: () => setZoom(1.0),
+            title: 'Réinitialiser le zoom'
+          }, '100%')
+        )
+      ),
+      
+      // Contenu principal
+      React.createElement('div', { className: 'viewer-content', ref: attachViewerContentRef },
+        isLoading && React.createElement('div', { className: 'loading-overlay' },
+          React.createElement('div', { className: 'spinner' }),
+          React.createElement('p', null, 'Chargement du PDF...')
+        ),
+        React.createElement('div', { className: 'pdf-canvas-container' },
+          React.createElement('canvas', { ref: canvasRef, id: 'pdf-canvas' })
+        )
+      ),
+      
+      // Section bookmarks
+      React.createElement(window.BookmarkList, {
+        bookmarks: bookmarks,
+        onNavigate: handleNavigateToBookmark,
+        onPreview: handlePreviewBookmark,
+        onUpdate: handleUpdateBookmark,
+        onDelete: handleDeleteBookmark,
+        onReorder: handleReorderBookmarks
+      }),
+      
+      // Modal de preview
+      previewBookmark && React.createElement('div', {
+        className: 'preview-overlay',
+        onClick: handleClosePreview
+      },
+        React.createElement('div', {
+          className: 'preview-modal',
+          onClick: (e) => e.stopPropagation()
+        },
+          React.createElement('div', { className: 'preview-header' },
+            React.createElement('h3', null, previewBookmark.title),
+            React.createElement('button', {
+              className: 'btn-secondary btn-icon btn-small',
+              onClick: handleClosePreview,
+              title: 'Fermer (Esc)'
+            }, '✕')
+          ),
+          React.createElement('div', { className: 'preview-body' },
+            previewBookmark.thumbnailPath
+              ? React.createElement('img', {
+                  src: `file://${previewBookmark.thumbnailPath}`,
+                  alt: `Aperçu ${previewBookmark.title}`,
+                  className: 'preview-image',
+                  onError: (e) => {
+                    console.error('Erreur chargement miniature:', previewBookmark.thumbnailPath);
+                    e.target.style.display = 'none';
+                  }
+                })
+              : React.createElement('div', { className: 'preview-placeholder' },
+                  `Aperçu non disponible pour ${previewBookmark.title}`
+                )
+          ),
+          React.createElement('div', { className: 'preview-footer' },
+            React.createElement('div', { className: 'preview-actions' },
+              React.createElement('button', {
+                className: 'btn-primary preview-action-btn',
+                onClick: () => {
+                  handleNavigateToBookmark(previewBookmark);
+                  handleClosePreview();
+                }
+              }, 'Afficher cette page'),
+              React.createElement('button', {
+                className: 'btn-secondary preview-action-btn',
+                onClick: handleClosePreview
+              }, 'Fermer')
+            )
+          )
+        )
+      )
+    );
+  }
+
+  // Exposer globalement
+  window.PdfViewer = PdfViewer;
+})();

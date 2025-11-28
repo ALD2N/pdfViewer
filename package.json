@@ -1,0 +1,49 @@
+{
+  "name": "pdf-viewer",
+  "version": "1.0.0",
+  "description": "Visualiseur de PDF local avec système de bookmarks",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "npm run copy-libs:dev && electron .",
+    "start:test": "ELECTRON_ENV=test npm start",
+    "build": "npm run copy-libs:prod && electron-builder",
+    "build:linux": "npm run copy-libs:prod && electron-builder --linux",
+    "build:win": "npm run copy-libs:prod && electron-builder --win",
+    "copy-libs:dev": "bash scripts/copy-libs.sh dev",
+    "copy-libs:prod": "bash scripts/copy-libs.sh prod",
+    "postinstall": "npm run copy-libs:dev",
+    "test": "jest",
+    "test:e2e": "npx start-server-and-test start:test http://localhost:3000 'cypress run'"
+  },
+  "author": "PDF Viewer Team <team@pdfviewer.com>",
+  "homepage": "https://github.com/pdfviewer/pdf-viewer",
+  "license": "MIT",
+  "jest": {
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/setupTests.js"
+    ]
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/preset-env": "^7.28.5",
+    "@babel/preset-react": "^7.28.5",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "babel-jest": "^30.2.0",
+    "cypress": "^13.0.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
+    "start-server-and-test": "^1.1.0"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "fs-extra": "^11.2.0",
+    "pdfjs-dist": "^4.0.379",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "uuid": "^9.0.1"
+  }
+}

@@ -1,0 +1,26 @@
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Electron cache
+*.log
+
+# Libs copiées depuis node_modules (générées à chaque build)
+src/renderer/libs/*.js
+src/renderer/libs/*.mjs
+!src/renderer/libs/.gitkeep
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
