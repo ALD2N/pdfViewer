@@ -5,12 +5,27 @@
  */
 
 (function() {
-  const { useState, useCallback } = React;
+  const { useState, useCallback, useRef, useEffect } = React;
+  const DISPLAY_MODES = {
+    THUMBNAILS: 'thumbnails',
+    COMPACT: 'compact'
+  };
 
   function BookmarkList({ bookmarks, onNavigate, onPreview, onUpdate, onDelete, onReorder }) {
     const [editingId, setEditingId] = useState(null);
     const [editTitle, setEditTitle] = useState('');
     const [draggedIndex, setDraggedIndex] = useState(null);
+    const [displayMode, setDisplayMode] = useState(DISPLAY_MODES.THUMBNAILS);
+    const clickTimeoutRef = useRef(null);
+
+    useEffect(() => {
+      return () => {
+        if (clickTimeoutRef.current) {
+          clearTimeout(clickTimeoutRef.current);
+          clickTimeoutRef.current = null;
+        }
+      };
+    }, []);
 
     // Commencer l'édition d'un titre
     const startEditing = useCallback((bookmark) => {
@@ -90,50 +105,102 @@
       setDraggedIndex(null);
     }, []);
 
-    return React.createElement('div', { className: 'bookmarks-section' },
-      React.createElement('div', { className: 'bookmarks-title' },
-        `Bookmarks (${bookmarks.length})`
+    const toggleDisplayMode = useCallback(() => {
+      setDisplayMode((current) =>
+        current === DISPLAY_MODES.THUMBNAILS
+          ? DISPLAY_MODES.COMPACT
+          : DISPLAY_MODES.THUMBNAILS
+      );
+    }, []);
+
+    const handleItemClick = useCallback((bookmark) => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = null;
+        return;
+      }
+
+      clickTimeoutRef.current = setTimeout(() => {
+        onPreview(bookmark);
+        clickTimeoutRef.current = null;
+      }, 180);
+    }, [onPreview]);
+
+    const handleItemDoubleClick = useCallback((bookmark) => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = null;
+      }
+      startEditing(bookmark);
+    }, [startEditing]);
+
+    const sectionClassName = `bookmarks-section ${displayMode === DISPLAY_MODES.COMPACT ? 'compact-mode' : 'thumbnails-mode'}`;
+    const listClassName = `bookmarks-list ${displayMode}`;
+
+    return React.createElement('div', { className: sectionClassName },
+      React.createElement('div', { className: 'bookmarks-header' },
+        React.createElement('div', { className: 'bookmarks-title' },
+          `Bookmarks (${bookmarks.length})`
+        ),
+        React.createElement('button', {
+          className: 'btn-secondary btn-small display-mode-btn',
+          onClick: toggleDisplayMode,
+          title: displayMode === DISPLAY_MODES.THUMBNAILS
+            ? 'Passer en mode compact'
+            : 'Afficher les vignettes',
+          'aria-label': displayMode === DISPLAY_MODES.THUMBNAILS
+            ? 'Passer en mode compact'
+            : 'Afficher les vignettes'
+        },
+          displayMode === DISPLAY_MODES.THUMBNAILS ? '▢' : '≡'
+        )
       ),
       
       bookmarks.length > 0
-        ? React.createElement('div', { className: 'bookmarks-list' },
+        ? React.createElement('div', { className: listClassName },
             bookmarks.map((bookmark, index) =>
               React.createElement('div', {
                 key: bookmark.id,
-                className: `bookmark-item ${draggedIndex === index ? 'dragging' : ''}`,
+                className: `bookmark-item ${draggedIndex === index ? 'dragging' : ''} ${displayMode === DISPLAY_MODES.COMPACT ? 'compact' : ''}`,
                 draggable: true,
                 onDragStart: (e) => handleDragStart(e, index),
                 onDragOver: handleDragOver,
                 onDrop: (e) => handleDrop(e, index),
                 onDragEnd: handleDragEnd,
-                onClick: () => onNavigate(bookmark)
+                onClick: () => handleItemClick(bookmark)
               },
-                // Miniature
-                React.createElement('div', { className: 'bookmark-thumbnail' },
-                  bookmark.thumbnailPath
-                    ? React.createElement('img', {
-                        src: `file://${bookmark.thumbnailPath}`,
-                        alt: `Page ${bookmark.page}`,
-                        onError: (e) => {
-                          console.error('Erreur chargement miniature:', bookmark.thumbnailPath);
-                          e.target.style.display = 'none';
-                        }
-                      })
-                    : React.createElement('div', {
-                        style: {
-                          width: '100%',
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '24px',
-                          color: 'var(--text-muted)'
-                        }
-                      }, '📄')
-                ),
+                displayMode === DISPLAY_MODES.THUMBNAILS &&
+                  React.createElement('div', { className: 'bookmark-thumbnail' },
+                    bookmark.thumbnailPath
+                      ? React.createElement('img', {
+                          src: `file://${bookmark.thumbnailPath}`,
+                          alt: `Page ${bookmark.page}`,
+                          onError: (e) => {
+                            console.error('Erreur chargement miniature:', bookmark.thumbnailPath);
+                            e.target.style.display = 'none';
+                          }
+                        })
+                      : React.createElement('div', {
+                          style: {
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '24px',
+                            color: 'var(--text-muted)'
+                          }
+                        }, '📄')
+                  ),
 
                 // Informations
-                React.createElement('div', { className: 'bookmark-info' },
+                React.createElement('div', {
+                  className: 'bookmark-info',
+                  onDoubleClick: (e) => {
+                    e.stopPropagation();
+                    handleItemDoubleClick(bookmark);
+                  }
+                },
                   editingId === bookmark.id
                     ? React.createElement('input', {
                         type: 'text',
@@ -155,11 +222,7 @@
                       })
                     : React.createElement('div', {
                         className: 'bookmark-title',
-                        onClick: (e) => {
-                          e.stopPropagation();
-                          startEditing(bookmark);
-                        },
-                        title: 'Cliquer pour éditer'
+                        title: 'Double-cliquer pour éditer'
                       }, bookmark.title),
                   React.createElement('div', { className: 'bookmark-page' }, `Page ${bookmark.page}`)
                 ),
@@ -170,10 +233,10 @@
                     className: 'btn-secondary btn-small',
                     onClick: (e) => {
                       e.stopPropagation();
-                      onPreview(bookmark);
+                      onNavigate(bookmark);
                     },
-                    title: 'Preview'
-                  }, '👁️'),
+                    title: 'Aller à la page'
+                  }, '➡️'),
                   React.createElement('button', {
                     className: 'btn-danger btn-small',
                     onClick: (e) => {

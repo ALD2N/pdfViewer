@@ -928,53 +928,40 @@
             title: 'Ajouter un bookmark (Ctrl+B)'
           }, isAddingBookmark ? '⏳ Ajout...' : '🔖 Bookmark')
         ),
-        React.createElement('div', { className: 'viewer-zoom' },
-          React.createElement('button', {
-            className: 'btn-icon',
-            onClick: () => setZoom(prev => Math.max(prev - 0.1, 0.5)),
-            title: 'Zoom arrière (Ctrl+-)'
-          }, '➖'),
-          React.createElement('span', { className: 'zoom-percent' }, `${Math.round(zoom * 100)}%`),
-          React.createElement('button', {
-            className: 'btn-icon',
-            onClick: () => setZoom(prev => Math.min(prev + 0.1, 3.0)),
-            title: 'Zoom avant (Ctrl++)'
-          }, '➕'),
-          React.createElement('button', {
-            className: 'btn-secondary btn-small',
-            onClick: () => setZoom(1.0),
-            title: 'Réinitialiser le zoom'
-          }, '100%')
-        )
+        React.createElement('div', { className: 'viewer-header-spacer' })
       ),
-      React.createElement('div', { className: 'viewer-content', ref: attachViewerContentRef },
-        isLoading ? React.createElement('div', { className: 'loading-overlay' },
-          React.createElement('div', { className: 'spinner' }),
-          React.createElement('p', null, 'Chargement du PDF...')
-        ) : null,
-        React.createElement('div', { className: 'pdf-canvas-container' },
-          React.createElement('canvas', { ref: canvasRef, id: 'pdf-canvas' }),
-          React.createElement('div', { 
-            ref: textLayerRef, 
-            className: 'pdf-text-layer',
-            draggable: false,
-            onDragStart: (e) => e.preventDefault()
-          }),
-          React.createElement('div', { 
-            ref: annotationLayerRef, 
-            className: 'pdf-annotation-layer' 
+      React.createElement('div', { className: 'viewer-body' },
+        // Section bookmarks (barre latérale)
+        React.createElement('div', { className: 'bookmarks-sidebar' },
+          React.createElement(window.BookmarkList, {
+            bookmarks: bookmarks,
+            onNavigate: handleNavigateToBookmark,
+            onPreview: handlePreviewBookmark,
+            onUpdate: handleUpdateBookmark,
+            onDelete: handleDeleteBookmark,
+            onReorder: handleReorderBookmarks
           })
+        ),
+        React.createElement('div', { className: 'viewer-content', ref: attachViewerContentRef },
+          isLoading ? React.createElement('div', { className: 'loading-overlay' },
+            React.createElement('div', { className: 'spinner' }),
+            React.createElement('p', null, 'Chargement du PDF...')
+          ) : null,
+          React.createElement('div', { className: 'pdf-canvas-container' },
+            React.createElement('canvas', { ref: canvasRef, id: 'pdf-canvas' }),
+            React.createElement('div', { 
+              ref: textLayerRef, 
+              className: 'pdf-text-layer',
+              draggable: false,
+              onDragStart: (e) => e.preventDefault()
+            }),
+            React.createElement('div', { 
+              ref: annotationLayerRef, 
+              className: 'pdf-annotation-layer' 
+            })
+          )
         )
       ),
-      // Section bookmarks
-      React.createElement(window.BookmarkList, {
-        bookmarks: bookmarks,
-        onNavigate: handleNavigateToBookmark,
-        onPreview: handlePreviewBookmark,
-        onUpdate: handleUpdateBookmark,
-        onDelete: handleDeleteBookmark,
-        onReorder: handleReorderBookmarks
-      }      ),
       // Modal de preview
       previewBookmark && React.createElement('div', {
         className: 'preview-overlay',
