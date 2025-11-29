@@ -1,6 +1,7 @@
 /**
  * PdfViewer.js - Composant de visualisation PDF avec bookmarks
  * Utilise PDF.js pour le rendu, supporte zoom, navigation et bookmarks
+ * Inclut TextLayer (sélection de texte) et AnnotationLayer (liens cliquables)
  */
 
 (function() {
@@ -11,6 +12,8 @@
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
     const viewerContentRef = useRef(null);
+    const textLayerRef = useRef(null);
+    const annotationLayerRef = useRef(null);
     const [viewerContentEl, setViewerContentEl] = useState(null);
     
     // États UI
@@ -31,6 +34,10 @@
     const renderQueueRef = useRef([]);
     const isMountedRef = useRef(true);
     const viewStateRef = useRef({ page: 1, zoom: 1 });
+    // NOUVEAU: Flag pour suivre l'état de destruction du document
+    const isDestroyingRef = useRef(false);
+    // NOUVEAU: AbortController pour les opérations asynchrones
+    const abortControllerRef = useRef(null);
 
     const attachViewerContentRef = useCallback((node) => {
       viewerContentRef.current = node;
@@ -39,6 +46,16 @@
 
     // Accès à PDF.js depuis window
     const pdfjsLib = window.pdfjsLib;
+
+    // NOUVEAU: Fonction pour vérifier si le document est valide et non détruit
+    const isDocumentValid = useCallback(() => {
+      return (
+        isMountedRef.current &&
+        !isDestroyingRef.current &&
+        pdfDocumentRef.current &&
+        !pdfDocumentRef.current.destroyed
+      );
+    }, []);
 
     // Fonction pour annuler le rendu en cours
     const cancelCurrentRender = useCallback(() => {
@@ -74,13 +91,260 @@
       return fitScale;
     }, []);
 
-    const renderPage = useCallback(async (pageNum, scale = zoom) => {
-      if (!pdfDocumentRef.current || !canvasRef.current || !isMountedRef.current) return;
-
-      cancelCurrentRender();
+    /**
+     * Gère la navigation vers un lien interne du PDF
+     * @param {Object|string|number} dest - Destination du lien (peut être un nom, un numéro de page, ou un objet de destination)
+     */
+    const handleInternalLink = useCallback(async (dest) => {
+      // MODIFIÉ: Vérification du document valide
+      if (!isDocumentValid()) return;
 
       try {
+        let pageIndex;
+
+        if (typeof dest === 'number') {
+          // Destination directe par numéro de page (0-indexed)
+          pageIndex = dest;
+        } else if (typeof dest === 'string') {
+          // Destination nommée - résoudre via le document
+          // MODIFIÉ: Vérification avant l'opération asynchrone
+          if (!isDocumentValid()) return;
+          const destArray = await pdfDocumentRef.current.getDestination(dest);
+          if (!isDocumentValid() || !destArray) return;
+          
+          const ref = destArray[0];
+          pageIndex = await pdfDocumentRef.current.getPageIndex(ref);
+        } else if (Array.isArray(dest)) {
+          // Destination explicite [ref, type, ...]
+          if (!isDocumentValid()) return;
+          const ref = dest[0];
+          pageIndex = await pdfDocumentRef.current.getPageIndex(ref);
+        } else if (dest && typeof dest === 'object' && dest.num !== undefined) {
+          // Référence directe à une page
+          if (!isDocumentValid()) return;
+          pageIndex = await pdfDocumentRef.current.getPageIndex(dest);
+        }
+
+        // Validation: s'assurer que pageIndex est un nombre valide
+        if (isDocumentValid() && typeof pageIndex === 'number' && pageIndex >= 0 && pageIndex < numPages) {
+          // PDF.js utilise des indices 0-based, notre state utilise 1-based
+          setCurrentPage(pageIndex + 1);
+        } else {
+          console.warn('Destination de lien interne invalide ou hors limites');
+        }
+      } catch (error) {
+        // MODIFIÉ: Ne logger que si ce n'est pas une erreur de transport destroyed
+        if (error.message && !error.message.includes('Transport destroyed')) {
+          console.warn('Erreur navigation lien interne:', error);
+        }
+      }
+    }, [numPages, isDocumentValid]);
+
+    /**
+     * Gère le clic sur un lien externe - ouvre dans le navigateur par défaut
+     * @param {string} url - URL à ouvrir
+     */
+    const handleExternalLink = useCallback((url) => {
+      if (!url || typeof url !== 'string') return;
+      
+      // Utiliser l'API Electron pour ouvrir dans le navigateur par défaut
+      if (window.electronAPI && window.electronAPI.openExternal) {
+        window.electronAPI.openExternal(url).catch((error) => {
+          console.error('Erreur ouverture lien externe:', error);
+        });
+      } else {
+        // Fallback pour les environnements sans Electron API
+        console.warn('API Electron non disponible, impossible d\'ouvrir:', url);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    }, []);
+
+    /**
+     * Nettoie les couches de texte et d'annotations
+     */
+    const clearLayers = useCallback(() => {
+      if (textLayerRef.current) {
+        textLayerRef.current.innerHTML = '';
+      }
+      if (annotationLayerRef.current) {
+        annotationLayerRef.current.innerHTML = '';
+      }
+    }, []);
+
+    /**
+     * Rend la couche de texte pour permettre la sélection
+     * @param {Object} page - Page PDF.js
+     * @param {Object} viewport - Viewport calculé
+     */
+    const renderTextLayer = useCallback(async (page, viewport) => {
+      if (!textLayerRef.current || !isDocumentValid()) return;
+
+      // Nettoyer la couche existante
+      textLayerRef.current.innerHTML = '';
+
+      try {
+        // MODIFIÉ: Vérification avant opération asynchrone
+        if (!isDocumentValid()) return;
+        const textContent = await page.getTextContent();
+        
+        // MODIFIÉ: Vérification après opération asynchrone
+        if (!isDocumentValid() || !textLayerRef.current) return;
+        
+        // Configurer les dimensions de la couche de texte
+        textLayerRef.current.style.width = `${viewport.width}px`;
+        textLayerRef.current.style.height = `${viewport.height}px`;
+
+        // Utiliser la nouvelle API TextLayer de PDF.js
+        const textLayer = new pdfjsLib.TextLayer({
+          textContentSource: textContent,
+          container: textLayerRef.current,
+          viewport: viewport
+        });
+
+        await textLayer.render();
+      } catch (error) {
+        // MODIFIÉ: Ignorer les erreurs si le document est en cours de destruction
+        if (error.name !== 'RenderingCancelledException' && isDocumentValid()) {
+          if (!error.message || !error.message.includes('Transport destroyed')) {
+            console.warn('Erreur rendu couche de texte:', error);
+          }
+        }
+      }
+    }, [pdfjsLib, isDocumentValid]);
+
+    /**
+     * Rend la couche d'annotations (liens, formulaires, etc.)
+     * @param {Object} page - Page PDF.js
+     * @param {Object} viewport - Viewport calculé
+     */
+    const renderAnnotationLayer = useCallback(async (page, viewport) => {
+      if (!annotationLayerRef.current || !isDocumentValid()) return;
+
+      // Nettoyer la couche existante
+      annotationLayerRef.current.innerHTML = '';
+
+      try {
+        // MODIFIÉ: Vérification avant opération asynchrone
+        if (!isDocumentValid()) return;
+        const annotations = await page.getAnnotations({ intent: 'display' });
+        
+        // MODIFIÉ: Vérification après opération asynchrone
+        if (!isDocumentValid() || !annotationLayerRef.current) return;
+        
+        if (!annotations || annotations.length === 0) {
+          return;
+        }
+
+        // Configurer les dimensions de la couche d'annotations
+        annotationLayerRef.current.style.width = `${viewport.width}px`;
+        annotationLayerRef.current.style.height = `${viewport.height}px`;
+
+        // Créer les éléments pour chaque annotation
+        for (const annotation of annotations) {
+          // Vérification continue pendant la boucle
+          if (!isDocumentValid()) return;
+          
+          // Ne traiter que les annotations de type lien
+          if (annotation.subtype !== 'Link') continue;
+
+          const rect = annotation.rect;
+          if (!rect || rect.length < 4) continue;
+
+          // Transformer les coordonnées PDF en coordonnées écran
+          const [x1, y1, x2, y2] = pdfjsLib.Util.normalizeRect(rect);
+          
+          // Appliquer la transformation du viewport
+          const bounds = viewport.convertToViewportRectangle([x1, y1, x2, y2]);
+          const left = Math.min(bounds[0], bounds[2]);
+          const top = Math.min(bounds[1], bounds[3]);
+          const width = Math.abs(bounds[2] - bounds[0]);
+          const height = Math.abs(bounds[3] - bounds[1]);
+
+          // Créer l'élément du lien
+          const linkElement = document.createElement('a');
+          linkElement.className = 'pdf-annotation pdf-annotation-link';
+          linkElement.style.left = `${left}px`;
+          linkElement.style.top = `${top}px`;
+          linkElement.style.width = `${width}px`;
+          linkElement.style.height = `${height}px`;
+
+          // Déterminer le type de lien et ajouter le gestionnaire approprié
+          if (annotation.url) {
+            // Lien externe
+            linkElement.href = annotation.url;
+            linkElement.title = `Ouvrir: ${annotation.url}`;
+            linkElement.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleExternalLink(annotation.url);
+            });
+          } else if (annotation.dest) {
+            // Lien interne avec destination nommée ou explicite
+            linkElement.href = '#';
+            linkElement.title = 'Aller à la destination';
+            linkElement.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleInternalLink(annotation.dest);
+            });
+          } else if (annotation.action) {
+            // Action spéciale (GoTo, URI, etc.)
+            const action = annotation.action;
+            
+            if (action.actionType === 'URI' && action.uri) {
+              linkElement.href = action.uri;
+              linkElement.title = `Ouvrir: ${action.uri}`;
+              linkElement.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleExternalLink(action.uri);
+              });
+            } else if (action.actionType === 'GoTo' && action.dest) {
+              linkElement.href = '#';
+              linkElement.title = 'Aller à la page';
+              linkElement.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleInternalLink(action.dest);
+              });
+            } else if (action.actionType === 'GoToR') {
+              // Lien vers un autre PDF - pour l'instant, juste afficher un message
+              linkElement.href = '#';
+              linkElement.title = 'Lien vers un autre document (non supporté)';
+              linkElement.style.cursor = 'not-allowed';
+              linkElement.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.warn('Liens vers d\'autres documents PDF non supportés');
+              });
+            }
+          }
+
+          annotationLayerRef.current.appendChild(linkElement);
+        }
+      } catch (error) {
+        // MODIFIÉ: Ignorer les erreurs si le document est en cours de destruction
+        if (isDocumentValid() && (!error.message || !error.message.includes('Transport destroyed'))) {
+          console.warn('Erreur rendu couche d\'annotations:', error);
+        }
+      }
+    }, [pdfjsLib, handleInternalLink, handleExternalLink, isDocumentValid]);
+
+    const renderPage = useCallback(async (pageNum, scale = zoom) => {
+      // MODIFIÉ: Vérification du document valide
+      if (!isDocumentValid() || !canvasRef.current) return;
+
+      cancelCurrentRender();
+      clearLayers();
+
+      try {
+        // MODIFIÉ: Vérification avant opération asynchrone
+        if (!isDocumentValid()) return;
         const page = await pdfDocumentRef.current.getPage(pageNum);
+        
+        // MODIFIÉ: Vérification après opération asynchrone
+        if (!isDocumentValid() || !canvasRef.current) return;
+        
         const baseViewport = page.getViewport({ scale: 1 });
         const fitScale = computeFitScale(baseViewport);
         const targetScale = Math.max(0.1, fitScale * scale);
@@ -96,21 +360,36 @@
           viewport: viewport,
         };
 
+        // MODIFIÉ: Vérification avant le rendu
+        if (!isDocumentValid()) return;
         renderTaskRef.current = page.render(renderContext);
         await renderTaskRef.current.promise;
+
+        // MODIFIÉ: Vérification après le rendu
+        if (!isDocumentValid()) return;
+
+        // Rendre les couches supplémentaires après le canvas
+        // TextLayer pour la sélection de texte
+        await renderTextLayer(page, viewport);
+        
+        // MODIFIÉ: Vérification entre les couches
+        if (!isDocumentValid()) return;
+        
+        // AnnotationLayer pour les liens cliquables
+        await renderAnnotationLayer(page, viewport);
 
       } catch (error) {
         if (error.name === 'RenderingCancelledException') {
           console.log('Rendu annulé (navigation rapide)');
-        } else {
+        } else if (isDocumentValid() && (!error.message || !error.message.includes('Transport destroyed'))) {
           console.error('Erreur rendu page:', error);
         }
       }
-    }, [zoom, cancelCurrentRender, computeFitScale]);
+    }, [zoom, cancelCurrentRender, clearLayers, computeFitScale, renderTextLayer, renderAnnotationLayer, isDocumentValid]);
 
     // Fonction pour traiter la file d'attente des rendus
     const processRenderQueue = useCallback(async () => {
-      if (isRenderingRef.current || renderQueueRef.current.length === 0 || !isMountedRef.current) {
+      if (isRenderingRef.current || renderQueueRef.current.length === 0 || !isDocumentValid()) {
         return;
       }
 
@@ -121,13 +400,15 @@
         await renderPage(pageNum, scale);
         resolve();
       } catch (error) {
-        console.error('Erreur lors du rendu de la page:', error);
+        if (isDocumentValid() && (!error.message || !error.message.includes('Transport destroyed'))) {
+          console.error('Erreur lors du rendu de la page:', error);
+        }
         resolve();
       } finally {
         isRenderingRef.current = false;
         setTimeout(processRenderQueue, 0);
       }
-    }, [renderPage]);
+    }, [renderPage, isDocumentValid]);
 
     // Fonction pour ajouter une tâche de rendu à la file
     const queueRender = useCallback((pageNum, scale) => {
@@ -140,10 +421,17 @@
     // Fonction pour générer une miniature et la sauvegarder sur disque
     // INV-03: Miniatures générées uniquement pour pages bookmarkées
     const generateAndSaveThumbnail = useCallback(async (pageNum) => {
-      if (!pdfDocumentRef.current) return null;
+      // MODIFIÉ: Vérification du document valide
+      if (!isDocumentValid()) return null;
 
       try {
+        // MODIFIÉ: Vérification avant opération asynchrone
+        if (!isDocumentValid()) return null;
         const page = await pdfDocumentRef.current.getPage(pageNum);
+        
+        // MODIFIÉ: Vérification après opération asynchrone
+        if (!isDocumentValid()) return null;
+        
         const baseViewport = page.getViewport({ scale: 1 });
 
         // Calculer un scale HD (jusqu'à 2K) en tenant compte du devicePixelRatio
@@ -166,7 +454,12 @@
           viewport,
         };
 
+        // MODIFIÉ: Vérification avant le rendu
+        if (!isDocumentValid()) return null;
         await page.render(renderContext).promise;
+        
+        // MODIFIÉ: Vérification après le rendu
+        if (!isDocumentValid()) return null;
 
         // Convertir en data URL pour envoi au main process
         const imageData = canvas.toDataURL('image/png');
@@ -185,18 +478,21 @@
           return null;
         }
       } catch (error) {
-        console.error('Erreur génération miniature:', error);
+        // MODIFIÉ: Ignorer les erreurs si le document est en cours de destruction
+        if (isDocumentValid() && (!error.message || !error.message.includes('Transport destroyed'))) {
+          console.error('Erreur génération miniature:', error);
+        }
         return null;
       }
-    }, [pdfData?.path]);
+    }, [pdfData?.path, isDocumentValid]);
 
     // Callback pour ajouter un bookmark
     // R2: Miniature obligatoire
     // R3: Persistance automatique
     // INV-02: Titre non-vide (défaut "Page X")
     const handleAddBookmark = useCallback(async () => {
-      // Validation: page valide et PDF chargé
-      if (isAddingBookmark || !pdfDocumentRef.current || !currentPage || currentPage < 1 || currentPage > numPages) {
+      // MODIFIÉ: Vérification du document valide
+      if (isAddingBookmark || !isDocumentValid() || !currentPage || currentPage < 1 || currentPage > numPages) {
         console.warn('Impossible d\'ajouter un bookmark : PDF non chargé ou page invalide.');
         return;
       }
@@ -227,7 +523,7 @@
             pdfData.path,
             addResult.bookmark.id,
             { thumbnailPath }
-          );
+);
           
           if (updateResult.success) {
             setBookmarks(updateResult.bookmarks);
@@ -241,7 +537,7 @@
       } finally {
         setIsAddingBookmark(false);
       }
-    }, [currentPage, numPages, pdfData.path, generateAndSaveThumbnail, isAddingBookmark]);
+    }, [currentPage, numPages, pdfData.path, generateAndSaveThumbnail, isAddingBookmark, isDocumentValid]);
 
     // Callback pour naviguer vers un bookmark
     const handleNavigateToBookmark = useCallback((bookmark) => {
@@ -314,18 +610,62 @@
       }
     }, [pdfData.path]);
 
+    // NOUVEAU: Fonction de nettoyage sécurisée du document PDF
+    const cleanupPdfDocument = useCallback(async () => {
+      // Marquer comme en cours de destruction
+      isDestroyingRef.current = true;
+
+      // Annuler le rendu en cours
+      cancelCurrentRender();
+      
+      // Vider la queue de rendu
+      renderQueueRef.current = [];
+      
+      // Nettoyer les couches
+      clearLayers();
+
+      // Attendre un court instant pour que les opérations asynchrones en cours se terminent
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Détruire le document PDF s'il existe
+      if (pdfDocumentRef.current) {
+        try {
+          await pdfDocumentRef.current.destroy();
+        } catch (error) {
+          // Ignorer les erreurs de destruction
+          console.warn('Erreur lors de la destruction du document PDF:', error);
+        }
+        pdfDocumentRef.current = null;
+      }
+
+      // Réinitialiser le flag de destruction
+      isDestroyingRef.current = false;
+    }, [cancelCurrentRender, clearLayers]);
+
     // Fonction de chargement du PDF
     const loadPdf = useCallback(async () => {
       if (!pdfData || !isMountedRef.current) return;
 
+      // NOUVEAU: Nettoyer le document précédent avant de charger le nouveau
+      if (pdfDocumentRef.current) {
+        await cleanupPdfDocument();
+      }
+
       try {
         setIsLoading(true);
+        
+        // NOUVEAU: Créer un nouveau AbortController
+        abortControllerRef.current = new AbortController();
         
         const pdfDataUint8 = new Uint8Array(pdfData.data);
         const loadingTask = pdfjsLib.getDocument({ data: pdfDataUint8 });
         const pdf = await loadingTask.promise;
         
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || isDestroyingRef.current) {
+          // Si le composant est démonté pendant le chargement, nettoyer
+          await pdf.destroy();
+          return;
+        }
         
         pdfDocumentRef.current = pdf;
         setNumPages(pdf.numPages);
@@ -337,11 +677,11 @@
         await queueRender(1, zoom);
         setIsLoading(false);
       } catch (err) {
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || isDestroyingRef.current) return;
         console.error('Erreur chargement PDF:', err);
         setIsLoading(false);
       }
-    }, [pdfData, zoom, queueRender, pdfjsLib]);
+    }, [pdfData, zoom, queueRender, pdfjsLib, cleanupPdfDocument]);
 
     // Effet pour charger le PDF au montage
     useEffect(() => {
@@ -350,20 +690,17 @@
       }
       
       return () => {
-        cancelCurrentRender();
-        if (pdfDocumentRef.current) {
-          pdfDocumentRef.current.destroy();
-          pdfDocumentRef.current = null;
-        }
+        // MODIFIÉ: Utiliser la fonction de nettoyage sécurisée
+        cleanupPdfDocument();
       };
-    }, [pdfData, loadPdf, cancelCurrentRender]);
+    }, [pdfData, loadPdf, cleanupPdfDocument]);
 
     // Effet pour gérer le changement de page ou de zoom
     useEffect(() => {
-      if (pdfDocumentRef.current && currentPage >= 1 && currentPage <= numPages) {
+      if (isDocumentValid() && currentPage >= 1 && currentPage <= numPages) {
         queueRender(currentPage, zoom);
       }
-    }, [currentPage, zoom, numPages, queueRender]);
+    }, [currentPage, zoom, numPages, queueRender, isDocumentValid]);
 
     useEffect(() => {
       viewStateRef.current = { page: currentPage, zoom };
@@ -381,7 +718,7 @@
     useEffect(() => {
       if (typeof ResizeObserver === 'undefined') {
         const handleResize = () => {
-          if (!pdfDocumentRef.current) return;
+          if (!isDocumentValid()) return;
           const { page, zoom: zoomLevel } = viewStateRef.current;
           queueRender(page, zoomLevel);
         };
@@ -393,14 +730,14 @@
       if (!contentEl) return undefined;
 
       const observer = new ResizeObserver(() => {
-        if (!pdfDocumentRef.current) return;
+        if (!isDocumentValid()) return;
         const { page, zoom: zoomLevel } = viewStateRef.current;
         queueRender(page, zoomLevel);
       });
 
       observer.observe(contentEl);
       return () => observer.disconnect();
-    }, [queueRender, viewerContentEl]);
+    }, [queueRender, viewerContentEl, isDocumentValid]);
 
     // === RACCOURCIS CLAVIER ===
     useEffect(() => {
@@ -466,6 +803,83 @@
       return () => window.removeEventListener('keydown', handleKeyDown);
     }, [currentPage, numPages, onGoHome, handleAddBookmark, previewBookmark, handleClosePreview]);
 
+    // === COPIE AUTOMATIQUE DU TEXTE SÉLECTIONNÉ ===
+    useEffect(() => {
+      const handleSelectionEnd = (event) => {
+        try {
+          // Si c'est un événement clavier, filtrer les touches de raccourci
+          if (event.type === 'keyup') {
+            // Ignorer les touches qui ne sont pas liées à la sélection
+            const isSelectionKey = (
+              event.key.startsWith('Arrow') ||
+              event.key === 'Shift' ||
+              event.key === 'Control' ||
+              event.key === 'Meta' ||
+              (event.key === 'a' && (event.ctrlKey || event.metaKey)) // Ctrl+A
+            );
+            
+            // Ignorer les raccourcis applicatifs (navigation, zoom, etc.)
+            if (!isSelectionKey) {
+              return;
+            }
+          }
+
+          const selection = document.getSelection();
+          
+          // Vérifier qu'il y a une sélection avec du texte
+          if (!selection || selection.isCollapsed) {
+            return;
+          }
+
+          const selectedText = selection.toString().trim();
+          
+          // Ne rien faire si le texte est vide
+          if (!selectedText) {
+            return;
+          }
+
+          // Vérifier que la sélection est dans le conteneur du PDF
+          if (!containerRef.current) {
+            return;
+          }
+
+          // Vérifier que l'anchorNode ou le focusNode est dans le conteneur PDF
+          const anchorNode = selection.anchorNode;
+          const focusNode = selection.focusNode;
+          
+          const isInContainer = (
+            (anchorNode && containerRef.current.contains(anchorNode)) ||
+            (focusNode && containerRef.current.contains(focusNode))
+          );
+
+          if (!isInContainer) {
+            return;
+          }
+
+          // Copier dans le presse-papier
+          navigator.clipboard.writeText(selectedText)
+            .catch((error) => {
+              // Gestion silencieuse des erreurs (permissions, etc.)
+              console.warn('Impossible de copier dans le presse-papier:', error.message || error);
+            });
+
+        } catch (error) {
+          // Gestion silencieuse des erreurs inattendues
+          console.warn('Erreur lors de la copie de sélection:', error.message || error);
+        }
+      };
+
+      // Écouter mouseup (fin de sélection souris) et keyup (fin de sélection clavier)
+      document.addEventListener('mouseup', handleSelectionEnd);
+      document.addEventListener('keyup', handleSelectionEnd);
+
+      // Cleanup
+      return () => {
+        document.removeEventListener('mouseup', handleSelectionEnd);
+        document.removeEventListener('keyup', handleSelectionEnd);
+      };
+    }, []); // Pas de dépendances - containerRef est stable (useRef)
+
     // === RENDU ===
     return React.createElement('div', { className: 'pdf-viewer', ref: containerRef },
       // Header (toolbar)
@@ -483,7 +897,7 @@
             title: 'Page précédente (←)'
           }, '◀'),
           React.createElement('div', { className: 'page-indicator' },
-            React.createElement('span', { className: 'page-info' }, `Page ${currentPage} / ${numPages}`),
+            React.createElement('span', { className: 'page-info' }, 'Page ' + currentPage + ' / ' + numPages),
             React.createElement('input', {
               type: 'number',
               min: 1,
@@ -533,18 +947,25 @@
           }, '100%')
         )
       ),
-      
-      // Contenu principal
       React.createElement('div', { className: 'viewer-content', ref: attachViewerContentRef },
-        isLoading && React.createElement('div', { className: 'loading-overlay' },
+        isLoading ? React.createElement('div', { className: 'loading-overlay' },
           React.createElement('div', { className: 'spinner' }),
           React.createElement('p', null, 'Chargement du PDF...')
-        ),
+        ) : null,
         React.createElement('div', { className: 'pdf-canvas-container' },
-          React.createElement('canvas', { ref: canvasRef, id: 'pdf-canvas' })
+          React.createElement('canvas', { ref: canvasRef, id: 'pdf-canvas' }),
+          React.createElement('div', { 
+            ref: textLayerRef, 
+            className: 'pdf-text-layer',
+            draggable: false,
+            onDragStart: (e) => e.preventDefault()
+          }),
+          React.createElement('div', { 
+            ref: annotationLayerRef, 
+            className: 'pdf-annotation-layer' 
+          })
         )
       ),
-      
       // Section bookmarks
       React.createElement(window.BookmarkList, {
         bookmarks: bookmarks,
@@ -553,8 +974,7 @@
         onUpdate: handleUpdateBookmark,
         onDelete: handleDeleteBookmark,
         onReorder: handleReorderBookmarks
-      }),
-      
+      }      ),
       // Modal de preview
       previewBookmark && React.createElement('div', {
         className: 'preview-overlay',
@@ -576,7 +996,7 @@
             previewBookmark.thumbnailPath
               ? React.createElement('img', {
                   src: `file://${previewBookmark.thumbnailPath}`,
-                  alt: `Aperçu ${previewBookmark.title}`,
+                  alt: 'Aperçu ' + previewBookmark.title,
                   className: 'preview-image',
                   onError: (e) => {
                     console.error('Erreur chargement miniature:', previewBookmark.thumbnailPath);
@@ -603,7 +1023,7 @@
             )
           )
         )
-      )
+      ),
     );
   }
 

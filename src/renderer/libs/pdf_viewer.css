@@ -606,7 +606,33 @@
     white-space:pre;
     cursor:text;
     transform-origin:0% 0%;
-  }
+    overflow: hidden;
+    box-sizing: border-box;
+    contain: layout style;
+    pointer-events: auto;
+    -webkit-user-drag: none;
+}
+
+/* FIX: Correction du problème de sélection de texte "tréssautante" dans le textLayer PDF.js
+ * Les éléments <br> (retours à la ligne du textLayer) créent des zones de hit invisibles
+ * dans les interlignes qui perturbent la sélection (saut de ~15 lignes au survol).
+ * Solution : supprimer toutes dimensions physiques et événements souris.
+ * 
+ * - pointer-events: none → désactive les événements souris
+ * - display: inline-block → permet l'application de width/height
+ * - width/height: 0 → supprime toute dimension physique
+ * - overflow: hidden → empêche tout débordement résiduel
+ * - font-size/line-height: 0 → élimine la hauteur intrinsèque typographique
+ */
+.textLayer br {
+    pointer-events: none;
+    display: inline-block;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    font-size: 0;
+    line-height: 0;
+}
 
 .textLayer  > :not(.markedContent),.textLayer .markedContent span:not(.markedContent){
     z-index:1;
