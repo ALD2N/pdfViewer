@@ -3,7 +3,7 @@
  * Gère les opérations système, la persistance et les IPC
  */
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs-extra');
 const crypto = require('crypto');
@@ -491,22 +491,21 @@ ipcMain.handle(IPC_CHANNELS.THUMBNAIL_GENERATE, async (event, { pdfPath, pageNum
 });
 
 /**
- * IPC: Récupérer une miniature existante
+ * IPC: Ouvrir une URL externe dans le navigateur par défaut
+ * Sécurité: n'autorise que les URLs http/https
  */
-ipcMain.handle(IPC_CHANNELS.THUMBNAIL_GET, async (event, thumbnailPath) => {
+ipcMain.handle('shell:open-external', async (event, url) => {
   try {
-    const exists = await fs.pathExists(thumbnailPath);
-    if (!exists) {
-      return { success: false, error: 'Miniature non trouvée' };
+    // Validation de sécurité - n'ouvrir que les URLs http/https
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return { success: false, error: 'Seules les URLs http/https sont autorisées' };
     }
-
-    const data = await fs.readFile(thumbnailPath);
-    return { 
-      success: true, 
-      data: `data:image/jpeg;base64,${data.toString('base64')}`
-    };
+    
+    await shell.openExternal(url);
+    return { success: true };
   } catch (error) {
-    console.error('Erreur récupération miniature:', error);
+    console.error('Erreur ouverture URL externe:', error);
     return { success: false, error: error.message };
   }
 });

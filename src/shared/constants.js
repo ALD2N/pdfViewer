@@ -9,7 +9,7 @@ const IPC_CHANNELS = {
   PDF_LOAD: 'pdf:load',
   PDF_GET_RECENT: 'pdf:get-recent',
   PDF_REMOVE_RECENT: 'pdf:remove-recent',
-  PDF_FORGET: 'pdf-forget',
+  PDF_FORGET: 'pdf:forget',
   PDF_DELETE: 'pdf:delete',
   PDF_VERIFY: 'pdf:verify',
 
@@ -23,6 +23,9 @@ const IPC_CHANNELS = {
   // Gestion des miniatures
   THUMBNAIL_GENERATE: 'thumbnail:generate',
   THUMBNAIL_GET: 'thumbnail:get',
+
+  // Shell - liens externes
+  SHELL_OPEN_EXTERNAL: 'shell:open-external',
 
   // Configuration
   CONFIG_GET: 'config:get',

@@ -135,7 +135,7 @@
     return React.createElement('div', { id: 'app' },
       // Rendu conditionnel selon la vue courante
       currentView === 'home'
-        ? React.createElement(HomeScreen, {
+        ? React.createElement(window.HomeScreen, {
             config: config,
             onOpenPdf: openPdf,
             onOpenDialog: openFileDialog,
@@ -143,7 +143,7 @@
             onForgetPdf: forgetPdf,
             onDeletePdf: deletePdf
           })
-        : React.createElement(PdfViewer, {
+        : React.createElement(window.PdfViewer, {
             pdfData: currentPdf,
             onGoHome: goHome
           })

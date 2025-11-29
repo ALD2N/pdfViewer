@@ -467,10 +467,20 @@ input:focus {
   position: absolute;
   top: 0;
   left: 0;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
-  opacity: 0.2;
+  opacity: 0.25;
   line-height: 1;
   pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-drag: none;
+  -webkit-user-drag: none;
+  -moz-user-drag: none;
+  -ms-user-drag: none;
 }
 
 .pdf-text-layer > span {
@@ -478,10 +488,21 @@ input:focus {
   white-space: pre;
   color: transparent;
   transform-origin: 0% 0%;
+  pointer-events: auto;
+  cursor: text;
+  user-drag: none;
+  -webkit-user-drag: none;
+  -moz-user-drag: none;
+  -ms-user-drag: none;
 }
 
+/* Sélection de texte visible */
 .pdf-text-layer ::selection {
-  background: rgba(0, 100, 200, 0.3);
+  background: rgba(0, 122, 204, 0.4);
+}
+
+.pdf-text-layer ::-moz-selection {
+  background: rgba(0, 122, 204, 0.4);
 }
 
 .pdf-text-layer .highlight {
@@ -515,8 +536,11 @@ input:focus {
   position: absolute;
   top: 0;
   left: 0;
+  right: 0;
+  bottom: 0;
   pointer-events: none;
   overflow: hidden;
+  z-index: 1;
 }
 
 .pdf-annotation {
@@ -525,15 +549,33 @@ input:focus {
 }
 
 .pdf-annotation-link {
+  display: block;
   cursor: pointer;
   border: 2px solid transparent;
-  border-radius: 2px;
-  transition: border-color 0.2s, background-color 0.2s;
+  border-radius: 3px;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  text-decoration: none;
 }
 
 .pdf-annotation-link:hover {
   border-color: var(--accent-light);
-  background-color: rgba(30, 144, 255, 0.1);
+  background-color: rgba(30, 144, 255, 0.15);
+  box-shadow: 0 0 8px rgba(30, 144, 255, 0.3);
+}
+
+.pdf-annotation-link:active {
+  background-color: rgba(30, 144, 255, 0.25);
+}
+
+/* Style pour les liens non supportés */
+.pdf-annotation-link[style*="not-allowed"] {
+  opacity: 0.5;
+}
+
+.pdf-annotation-link[style*="not-allowed"]:hover {
+  border-color: var(--text-muted);
+  background-color: rgba(136, 136, 136, 0.1);
+  box-shadow: none;
 }
 
 .pdf-annotation-widget {

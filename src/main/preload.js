@@ -21,6 +21,7 @@ const ALLOWED_CHANNELS = [
   'bookmark:get-all',
   'thumbnail:generate',
   'thumbnail:get',
+  'shell:open-external',
   'config:get',
   'config:save',
   'error',
@@ -90,7 +91,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     if (typeof filePath !== 'string') {
       return Promise.reject(new Error('Chemin invalide'));
     }
-    return ipcRenderer.invoke('pdf-forget', filePath);
+    return ipcRenderer.invoke('pdf:forget', filePath);
   },
 
   /**
@@ -215,6 +216,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return Promise.reject(new Error('Chemin invalide'));
     }
     return ipcRenderer.invoke('thumbnail:get', thumbnailPath);
+  },
+
+  // ============================================
+  // SHELL - LIENS EXTERNES
+  // ============================================
+
+  /**
+   * Ouvre une URL dans le navigateur par défaut
+   * @param {string} url - URL à ouvrir
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  openExternal: (url) => {
+    if (typeof url !== 'string' || !url.trim()) {
+      return Promise.reject(new Error('URL invalide'));
+    }
+    // Validation basique de l'URL
+    try {
+      new URL(url);
+    } catch {
+      return Promise.reject(new Error('URL malformée'));
+    }
+    return ipcRenderer.invoke('shell:open-external', url);
   },
 
   // ============================================
