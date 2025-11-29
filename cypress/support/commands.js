@@ -26,3 +26,15 @@ Cypress.Commands.add('addBookmark', (pdfPath, page, title) => {
     return win.electronAPI.addBookmark(pdfPath, page, title);
   });
 });
+
+Cypress.Commands.add('getRecentPdfs', () => {
+  cy.window().then((win) => {
+    return win.electronAPI.getRecentPdfs();
+  });
+});
+
+Cypress.Commands.add('removeRecentPdf', (pdfPath) => {
+  cy.window().then((win) => {
+    return win.electronAPI.removeRecentPdf(pdfPath);
+  });
+});

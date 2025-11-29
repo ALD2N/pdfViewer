@@ -1023,6 +1023,14 @@ input:focus {
   justify-content: flex-end;
 }
 
+/* Note dans le modal de confirmation */
+.confirm-note {
+  font-size: 0.85em;
+  color: #888;
+  font-style: italic;
+  margin-top: 0.5em;
+}
+
 /* ============================================
    RESPONSIVE DESIGN
    ============================================ */

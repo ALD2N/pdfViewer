@@ -11,7 +11,7 @@ const ALLOWED_CHANNELS = [
   'pdf:load',
   'pdf:get-recent',
   'pdf:remove-recent',
-  'pdf-forget',
+  'pdf:forget',  // ✅ CORRECTION : remplacer 'pdf-forget' par 'pdf:forget'
   'pdf:delete',
   'pdf:verify',
   'bookmark:add',

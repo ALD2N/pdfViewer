@@ -77,51 +77,22 @@
       setCurrentView('home');
       setCurrentPdf(null);
       await loadConfig();
-    }, [loadConfig]);
+    }, []);
 
-    // Supprimer un PDF des récents
-    const removeFromRecents = useCallback(async (pdfPath) => {
-      try {
-        const result = await window.electronAPI.removeRecentPdf(pdfPath);
-        if (result.success) {
-          await loadConfig();
-        } else {
-          console.error(result.error || 'Erreur lors de la suppression');
-        }
-      } catch (error) {
-        console.error('Erreur suppression PDF récent:', error);
-      }
-    }, [loadConfig]);
-
-    // Supprimer définitivement un PDF du disque
-    const deletePdf = useCallback(async (pdfPath) => {
-      try {
-        const result = await window.electronAPI.deletePdf(pdfPath);
-        if (result.success) {
-          await loadConfig();
-        } else if (result.code === 'PERMISSION_DENIED') {
-          console.error('Permission refusée : impossible de supprimer ce fichier');
-        } else {
-          console.error(result.error || 'Erreur lors de la suppression');
-        }
-      } catch (error) {
-        console.error('Erreur suppression PDF:', error);
-      }
-    }, [loadConfig]);
-
-    // Oublier un PDF : supprimer toutes les données mais laisser le fichier intact
-    const forgetPdf = useCallback(async (pdfPath) => {
+    // Retirer un PDF : supprime de l'historique ET nettoie toutes les données associées
+    // (bookmarks, miniatures) mais laisse le fichier physique intact
+    const removePdf = useCallback(async (pdfPath) => {
       try {
         const result = await window.electronAPI.forgetPdf(pdfPath);
         if (result.success) {
           await loadConfig();
         } else {
-          console.error(result.error || 'Erreur lors de l\'oubli du PDF');
+          console.error(result.error || 'Erreur lors du retrait du PDF');
         }
       } catch (error) {
-        console.error('Erreur oubli PDF:', error);
+        console.error('Erreur retrait PDF:', error);
       }
-    }, [loadConfig]);
+    }, []);
 
     // Affichage du loading
     if (loading) {
@@ -133,20 +104,17 @@
 
     // Rendu de l'application
     return React.createElement('div', { id: 'app' },
-      // Rendu conditionnel selon la vue courante
-      currentView === 'home'
+      (currentView === 'home'
         ? React.createElement(window.HomeScreen, {
             config: config,
             onOpenPdf: openPdf,
             onOpenDialog: openFileDialog,
-            onRemovePdf: removeFromRecents,
-            onForgetPdf: forgetPdf,
-            onDeletePdf: deletePdf
+            onRemovePdf: removePdf
           })
         : React.createElement(window.PdfViewer, {
             pdfData: currentPdf,
             onGoHome: goHome
-          })
+          }))
     );
   }
 

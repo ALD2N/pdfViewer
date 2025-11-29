@@ -355,7 +355,11 @@ class PersistenceService {
     // Supprimer de l'historique récent
     this.config.recentPdfs = this.config.recentPdfs.filter(p => p !== pdfPath);
 
-    this.scheduleSave();
+    // Sauvegarde immédiate (au lieu de scheduleSave) pour garantir la cohérence.
+    // Cette action critique doit être persistée sur le disque AVANT tout rechargement
+    // de config par le renderer (via getRecentPdfs/getBookmarks).
+    await this.saveConfig();
+    
     return thumbnailPaths;
   }
 

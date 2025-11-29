@@ -6,8 +6,8 @@
 (function() {
   const { useState, useCallback } = React;
 
-  function HomeScreen({ config, onOpenPdf, onOpenDialog, onRemovePdf, onForgetPdf, onDeletePdf }) {
-    const [confirmAction, setConfirmAction] = useState(null); // { type: 'remove' | 'forget' | 'delete', path: string }
+  function HomeScreen({ config, onOpenPdf, onOpenDialog, onRemovePdf }) {
+    const [confirmRemove, setConfirmRemove] = useState(null); // pdfPath à confirmer ou null
 
     const recentPdfs = config?.recentPdfs || [];
 
@@ -42,42 +42,23 @@
       onOpenPdf(pdfPath);
     }, [onOpenPdf]);
 
-    // Demander confirmation de retrait de l'historique
+    // Demander confirmation de retrait
     const askRemoveConfirmation = useCallback((e, pdfPath) => {
       e.stopPropagation();
-      setConfirmAction({ type: 'remove', path: pdfPath });
+      setConfirmRemove(pdfPath);
     }, []);
 
-    // Demander confirmation d'oubli du PDF
-    const askForgetConfirmation = useCallback((e, pdfPath) => {
-      e.stopPropagation();
-      setConfirmAction({ type: 'forget', path: pdfPath });
-    }, []);
-
-    // Demander confirmation de suppression du fichier
-    const askDeleteConfirmation = useCallback((e, pdfPath) => {
-      e.stopPropagation();
-      setConfirmAction({ type: 'delete', path: pdfPath });
-    }, []);
-
-    // Confirmer l'action
-    const confirmCurrentAction = useCallback(() => {
-      if (!confirmAction) return;
-      
-      if (confirmAction.type === 'remove') {
-        onRemovePdf(confirmAction.path);
-      } else if (confirmAction.type === 'forget') {
-        onForgetPdf(confirmAction.path);
-      } else if (confirmAction.type === 'delete') {
-        onDeletePdf(confirmAction.path);
+    // Confirmer le retrait
+    const confirmRemoveAction = useCallback(() => {
+      if (confirmRemove) {
+        onRemovePdf(confirmRemove);
+        setConfirmRemove(null);
       }
-      
-      setConfirmAction(null);
-    }, [confirmAction, onRemovePdf, onForgetPdf, onDeletePdf]);
+    }, [confirmRemove, onRemovePdf]);
 
-    // Annuler l'action
-    const cancelAction = useCallback(() => {
-      setConfirmAction(null);
+    // Annuler le retrait
+    const cancelRemove = useCallback(() => {
+      setConfirmRemove(null);
     }, []);
 
     return React.createElement('div', { className: 'home-screen' },
@@ -105,23 +86,13 @@
                     React.createElement('div', { className: 'pdf-name' }, getFileName(pdfPath)),
                     React.createElement('div', { className: 'pdf-path' }, truncatePath(pdfPath))
                   ),
-                   React.createElement('div', { className: 'pdf-actions' },
-                     React.createElement('button', {
-                       className: 'btn-secondary',
-                       onClick: (e) => askRemoveConfirmation(e, pdfPath),
-                       title: 'Retirer de l\'historique sans supprimer le fichier'
-                     }, '🗑️ Retirer'),
-                     React.createElement('button', {
-                       className: 'btn-warning',
-                       onClick: (e) => askForgetConfirmation(e, pdfPath),
-                       title: 'Supprimer toutes les données (bookmarks, miniatures) mais laisser le fichier'
-                     }, '💭 Oublier'),
-                     React.createElement('button', {
-                       className: 'btn-danger',
-                       onClick: (e) => askDeleteConfirmation(e, pdfPath),
-                       title: 'Supprimer définitivement le fichier du disque'
-                     }, '❌ Supprimer')
-                   )
+                  React.createElement('div', { className: 'pdf-actions' },
+                    React.createElement('button', {
+                      className: 'btn-danger',
+                      onClick: (e) => askRemoveConfirmation(e, pdfPath),
+                      title: 'Retirer de la liste et supprimer les données associées (bookmarks, miniatures)'
+                    }, '🗑️ Retirer')
+                  )
                 );
               })
             )
@@ -141,31 +112,24 @@
       ),
 
       // Dialog de confirmation
-      confirmAction && React.createElement('div', { className: 'confirm-overlay' },
+      confirmRemove && React.createElement('div', { className: 'confirm-overlay' },
         React.createElement('div', { className: 'confirm-modal' },
-          React.createElement('h3', null, 
-            confirmAction.type === 'remove' 
-              ? 'Retirer de l\'historique ?' 
-              : confirmAction.type === 'forget'
-              ? 'Oublier ce PDF ?'
-              : '⚠️ Supprimer le fichier ?'
-          ),
+          React.createElement('h3', null, 'Retirer ce PDF ?'),
           React.createElement('p', null, 
-            confirmAction.type === 'remove'
-              ? 'Ce PDF sera retiré de l\'historique mais le fichier restera sur votre disque.'
-              : confirmAction.type === 'forget'
-              ? 'Toutes les données associées (bookmarks, miniatures) seront supprimées, mais le fichier PDF restera sur votre disque.'
-              : 'Le fichier PDF sera définitivement supprimé du disque. Cette action est irréversible !'
+            'Ce PDF sera retiré de la liste et toutes les données associées (bookmarks, miniatures) seront supprimées.'
+          ),
+          React.createElement('p', { className: 'confirm-note' }, 
+            'Le fichier PDF restera sur votre disque.'
           ),
           React.createElement('div', { className: 'confirm-actions' },
             React.createElement('button', {
               className: 'confirm-btn btn-secondary',
-              onClick: cancelAction
+              onClick: cancelRemove
             }, 'Annuler'),
             React.createElement('button', {
-              className: `confirm-btn ${confirmAction.type === 'delete' ? 'btn-danger' : confirmAction.type === 'forget' ? 'btn-warning' : 'btn-primary'}`,
-              onClick: confirmCurrentAction
-            }, confirmAction.type === 'remove' ? 'Retirer' : confirmAction.type === 'forget' ? 'Oublier' : 'Supprimer définitivement')
+              className: 'confirm-btn btn-danger',
+              onClick: confirmRemoveAction
+            }, 'Retirer')
           )
         )
       )

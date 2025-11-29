@@ -16,19 +16,34 @@
 // Import commands.js using ES2015 syntax:
 import './commands'
 
+// Mock data for recent PDFs
+let mockRecentPdfs = [
+  {
+    path: 'test.pdf',
+    name: 'test.pdf',
+    exists: true,
+    lastOpened: '2023-11-29T10:00:00.000Z',
+    bookmarkCount: 0
+  }
+];
+
 // Global hooks
 beforeEach(() => {
-  cy.visit('/');
-  cy.window().then((win) => {
-    win.electronAPI = {
-      getRecentPdfs: cy.stub().resolves({ recentPdfs: [] }),
-      loadPdf: cy.stub().resolves({ success: true, data: new ArrayBuffer(8), hash: 'mockhash', hashChanged: false, bookmarks: [] }),
-      getBookmarks: cy.stub().resolves({ success: true, bookmarks: [] }),
-      addBookmark: cy.stub().resolves({ success: true }),
-      openPdfDialog: cy.stub().resolves('test.pdf'),
-      removeRecentPdf: cy.stub().resolves({ success: true }),
-      forgetPdf: cy.stub().resolves({ success: true }),
-      deletePdf: cy.stub().resolves({ success: true }),
-    };
+  cy.visit('/', {
+    onBeforeLoad: (win) => {
+      win.electronAPI = {
+        getRecentPdfs: () => Promise.resolve({ success: true, recentPdfs: mockRecentPdfs.slice() }),
+        loadPdf: () => Promise.resolve({ success: true, data: new ArrayBuffer(8), hash: 'mockhash', hashChanged: false, bookmarks: [] }),
+        getBookmarks: () => Promise.resolve({ success: true, bookmarks: [] }),
+        addBookmark: () => Promise.resolve({ success: true }),
+        openPdfDialog: () => Promise.resolve('test.pdf'),
+        removeRecentPdf: (pdfPath) => {
+          mockRecentPdfs = mockRecentPdfs.filter(pdf => pdf.path !== pdfPath);
+          return Promise.resolve({ success: true });
+        },
+        forgetPdf: () => Promise.resolve({ success: true }),
+        deletePdf: () => Promise.resolve({ success: true }),
+      };
+    }
   });
 });
