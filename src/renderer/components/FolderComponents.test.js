@@ -77,9 +77,24 @@ describe('Folder Components', () => {
       expect(typeof window.OrphanPdfList).toBe('function');
     });
 
-    test('Renders with orphan PDFs', () => {
+    test('Renders with orphan PDFs (string format)', () => {
       const mockProps = {
         orphanPdfs: ['/test1.pdf', '/test2.pdf'],
+        onOpenPdf: jest.fn()
+      };
+
+      render(React.createElement(window.OrphanPdfList, mockProps));
+
+      expect(screen.getByText('test1.pdf')).toBeInTheDocument();
+      expect(screen.getByText('test2.pdf')).toBeInTheDocument();
+    });
+
+    test('Renders with orphan PDFs (object format from IPC)', () => {
+      const mockProps = {
+        orphanPdfs: [
+          { path: '/home/user/docs/test1.pdf', name: 'test1.pdf', exists: true },
+          { path: '/home/user/docs/test2.pdf', name: 'test2.pdf', exists: true }
+        ],
         onOpenPdf: jest.fn()
       };
 
