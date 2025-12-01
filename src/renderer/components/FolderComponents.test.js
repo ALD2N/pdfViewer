@@ -70,6 +70,111 @@ describe('Folder Components', () => {
       expect(screen.getByText('Test Folder')).toBeInTheDocument();
       expect(screen.getByText('(1)')).toBeInTheDocument(); // PDF count
     });
+
+    test('Click on folder line toggles expansion for folders with children', () => {
+      const mockFolders = {
+        'parent': {
+          name: 'Parent Folder',
+          parentId: null,
+          childrenIds: ['child'],
+          pdfPaths: []
+        },
+        'child': {
+          name: 'Child Folder',
+          parentId: 'parent',
+          childrenIds: [],
+          pdfPaths: []
+        }
+      };
+
+      const onToggleExpand = jest.fn();
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        expandedFolders: new Set(),
+        onToggleExpand
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Cliquer sur la ligne du dossier parent (qui a des enfants)
+      const parentFolderLine = screen.getByText('Parent Folder').closest('.folder-header');
+      fireEvent.click(parentFolderLine);
+
+      expect(onToggleExpand).toHaveBeenCalledWith('parent');
+    });
+
+    test('Click on folder line does not toggle for folders without children', () => {
+      const mockFolders = {
+        'folder1': {
+          name: 'Leaf Folder',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: ['/test.pdf']
+        }
+      };
+
+      const onToggleExpand = jest.fn();
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        expandedFolders: new Set(),
+        onToggleExpand
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Cliquer sur la ligne du dossier sans enfants
+      const leafFolderLine = screen.getByText('Leaf Folder').closest('.folder-header');
+      fireEvent.click(leafFolderLine);
+
+      // Ne doit pas déclencher onToggleExpand pour un dossier sans enfants
+      expect(onToggleExpand).not.toHaveBeenCalled();
+    });
+
+    test('Click on expand icon triggers toggle and does not propagate', () => {
+      const mockFolders = {
+        'parent': {
+          name: 'Parent Folder',
+          parentId: null,
+          childrenIds: ['child'],
+          pdfPaths: []
+        },
+        'child': {
+          name: 'Child Folder',
+          parentId: 'parent',
+          childrenIds: [],
+          pdfPaths: []
+        }
+      };
+
+      const onToggleExpand = jest.fn();
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        expandedFolders: new Set(),
+        onToggleExpand
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Cliquer spécifiquement sur l'icône expand
+      const expandIcon = document.querySelector('.expand-icon');
+      fireEvent.click(expandIcon);
+
+      // Doit déclencher une seule fois (pas de double appel avec la ligne)
+      expect(onToggleExpand).toHaveBeenCalledTimes(1);
+      expect(onToggleExpand).toHaveBeenCalledWith('parent');
+    });
   });
 
   describe('OrphanPdfList Component', () => {
