@@ -138,6 +138,44 @@ describe('Folder Components', () => {
       expect(onToggleExpand).not.toHaveBeenCalled();
     });
 
+    test('Click on folder line toggles expansion for folders with only PDFs (no children)', () => {
+      const mockFolders = {
+        'pdfOnly': {
+          name: 'PDF Only Folder',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: ['/doc1.pdf', '/doc2.pdf']
+        }
+      };
+
+      const onToggleExpand = jest.fn();
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        expandedFolders: new Set(),
+        onToggleExpand
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Vérifier que le dossier a bien la classe expandable
+      const folderHeader = screen.getByText('PDF Only Folder').closest('.folder-header');
+      expect(folderHeader).toHaveClass('expandable');
+
+      // Vérifier que l'icône d'expansion est présente
+      const expandIcon = folderHeader.querySelector('.expand-icon');
+      expect(expandIcon).toBeInTheDocument();
+
+      // Cliquer sur la ligne du dossier avec PDFs seulement
+      fireEvent.click(folderHeader);
+
+      // Doit déclencher onToggleExpand
+      expect(onToggleExpand).toHaveBeenCalledWith('pdfOnly');
+    });
+
     test('Click on expand icon triggers toggle and does not propagate', () => {
       const mockFolders = {
         'parent': {
