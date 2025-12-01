@@ -4,6 +4,7 @@
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
+const { Menu } = require('electron');
 
 // Définition des canaux IPC autorisés (whitelist)
 const ALLOWED_CHANNELS = [
@@ -317,6 +318,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
     return ipcRenderer.invoke('shell:open-external', url);
   },
+
+  // ============================================
+  // MENU API
+  // ============================================
+
+  /**
+   * Menu API for context menus
+   */
+  Menu: Menu,
 
   // ============================================
   // ÉVÉNEMENTS
