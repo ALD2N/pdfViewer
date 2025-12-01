@@ -196,6 +196,10 @@ input:focus {
   min-height: 0;
 }
 
+.home-actions {
+  margin-top: 24px;
+}
+
 .column {
   flex: 1;
   display: flex;
@@ -309,6 +313,10 @@ input:focus {
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.pdf-actions + .drag-handle {
+  margin-left: 12px;
 }
 
 .pdf-item .pdf-actions button {
