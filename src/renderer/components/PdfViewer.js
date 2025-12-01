@@ -27,6 +27,9 @@
     const [previewBookmark, setPreviewBookmark] = useState(null);
     const [isAddingBookmark, setIsAddingBookmark] = useState(false);
     
+    // État modale confirmation suppression bookmark
+    const [deleteConfirmModal, setDeleteConfirmModal] = useState(null);
+    
     // États mode sidebar
     const [sidebarMode, setSidebarMode] = useState('bookmarks'); // 'bookmarks' ou 'search'
     
@@ -735,9 +738,15 @@
       }
     }, [pdfData.path]);
 
-    // Callback pour supprimer un bookmark
-    const handleDeleteBookmark = useCallback(async (bookmarkId) => {
-      if (!confirm('Supprimer ce bookmark ?')) return;
+    // Callback pour supprimer un bookmark (ouvre la modale de confirmation)
+    const handleDeleteBookmark = useCallback((bookmarkId) => {
+      setDeleteConfirmModal({ bookmarkId });
+    }, []);
+
+    // Exécuter la suppression après confirmation modale
+    const executeDeleteBookmark = useCallback(async () => {
+      if (!deleteConfirmModal) return;
+      const { bookmarkId } = deleteConfirmModal;
       
       try {
         const result = await window.electronAPI.deleteBookmark(pdfData.path, bookmarkId);
@@ -748,8 +757,10 @@
         }
       } catch (error) {
         console.error('Erreur suppression bookmark:', error);
+      } finally {
+        setDeleteConfirmModal(null);
       }
-    }, [pdfData.path]);
+    }, [pdfData.path, deleteConfirmModal]);
 
     // Callback pour réorganiser les bookmarks
     // R6: Ordre réorganisable par l'utilisateur
@@ -1270,6 +1281,28 @@
                 onClick: handleClosePreview
               }, 'Fermer')
             )
+          )
+        )
+      ),
+      // Modale de confirmation suppression bookmark
+      deleteConfirmModal && React.createElement('div', {
+        className: 'modal-overlay',
+        onClick: () => setDeleteConfirmModal(null)
+      },
+        React.createElement('div', {
+          className: 'modal',
+          onClick: (e) => e.stopPropagation()
+        },
+          React.createElement('div', { className: 'modal-title' }, 'Supprimer ce bookmark ?'),
+          React.createElement('div', { className: 'modal-buttons' },
+            React.createElement('button', {
+              className: 'btn-danger',
+              onClick: executeDeleteBookmark
+            }, 'Supprimer'),
+            React.createElement('button', {
+              className: 'btn-secondary',
+              onClick: () => setDeleteConfirmModal(null)
+            }, 'Annuler')
           )
         )
       ),
