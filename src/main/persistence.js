@@ -88,8 +88,16 @@ class PersistenceService {
       version: config.version || CONFIG.CONFIG_VERSION,
       recentPdfs: Array.isArray(config.recentPdfs) ? config.recentPdfs : [],
       bookmarks: typeof config.bookmarks === 'object' && config.bookmarks !== null 
-        ? config.bookmarks : {}
+        ? config.bookmarks : {},
+      folders: typeof config.folders === 'object' && config.folders !== null 
+        ? config.folders : {}
     };
+
+    // Migration de version 1.0 à 1.1 : ajouter folders vide
+    if (validated.version === '1.0') {
+      validated.version = '1.1';
+      validated.folders = {};
+    }
 
     // Limiter le nombre de PDFs récents
     if (validated.recentPdfs.length > CONFIG.MAX_RECENT_PDFS) {
@@ -123,6 +131,21 @@ class PersistenceService {
           bookmark.title = `Page ${bookmark.page}`;
         }
       });
+    }
+
+    // Valider la structure des folders
+    for (const folderId of Object.keys(validated.folders)) {
+      const folder = validated.folders[folderId];
+      if (!folder || typeof folder !== 'object') {
+        delete validated.folders[folderId];
+        continue;
+      }
+
+      // Assurer la structure des folders
+      folder.name = typeof folder.name === 'string' ? folder.name.trim() : 'Dossier sans nom';
+      folder.parentId = folder.parentId === null || typeof folder.parentId === 'string' ? folder.parentId : null;
+      folder.childrenIds = Array.isArray(folder.childrenIds) ? folder.childrenIds.filter(id => typeof id === 'string') : [];
+      folder.pdfPaths = Array.isArray(folder.pdfPaths) ? folder.pdfPaths.filter(path => typeof path === 'string') : [];
     }
 
     return validated;
@@ -390,6 +413,22 @@ class PersistenceService {
     }
 
     pdfData.bookmarks = reordered;
+    this.scheduleSave();
+  }
+
+  /**
+   * Charge les dossiers depuis la configuration
+   * @returns {Promise<Object>} - Objet folders
+   */
+  async loadFolders() {
+    return this.config.folders || {};
+  }
+
+  /**
+   * Sauvegarde les dossiers dans la configuration
+   * R18: Persistance automatique des dossiers
+   */
+  async saveFolders() {
     this.scheduleSave();
   }
 }

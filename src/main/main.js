@@ -10,10 +10,12 @@ const crypto = require('crypto');
 const { IPC_CHANNELS, CONFIG } = require('../shared/constants.js');
 const PersistenceService = require('./persistence.js');
 const ThumbnailService = require('./thumbnail.js');
+const FolderService = require('./folderService.js');
 
 let mainWindow = null;
 let persistenceService = null;
 let thumbnailService = null;
+let folderService = null;
 
 /**
  * Crée la fenêtre principale de l'application
@@ -71,6 +73,9 @@ async function initServices() {
 
   thumbnailService = new ThumbnailService(configDir);
   await thumbnailService.init();
+
+  folderService = new FolderService(persistenceService);
+  await folderService.init();
 }
 
 /**
@@ -506,6 +511,117 @@ ipcMain.handle('shell:open-external', async (event, url) => {
     return { success: true };
   } catch (error) {
     console.error('Erreur ouverture URL externe:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * IPC: Charger les dossiers
+ */
+ipcMain.handle(IPC_CHANNELS.FOLDER_LOAD, async () => {
+  try {
+    const folders = folderService.getFolders();
+    return { success: true, folders };
+  } catch (error) {
+    console.error('Erreur chargement dossiers:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * IPC: Créer un dossier
+ */
+ipcMain.handle(IPC_CHANNELS.FOLDER_CREATE, async (event, { name, parentId }) => {
+  try {
+    const folder = await folderService.createFolder(name, parentId);
+    const folders = folderService.getFolders();
+    return { success: true, folder, folders };
+  } catch (error) {
+    console.error('Erreur création dossier:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * IPC: Mettre à jour un dossier
+ */
+ipcMain.handle(IPC_CHANNELS.FOLDER_UPDATE, async (event, { id, updates }) => {
+  try {
+    const folder = await folderService.updateFolder(id, updates);
+    const folders = folderService.getFolders();
+    return { success: true, folder, folders };
+  } catch (error) {
+    console.error('Erreur mise à jour dossier:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * IPC: Supprimer un dossier
+ */
+ipcMain.handle(IPC_CHANNELS.FOLDER_DELETE, async (event, { id }) => {
+  try {
+    await folderService.deleteFolder(id);
+    const folders = folderService.getFolders();
+    return { success: true, folders };
+  } catch (error) {
+    console.error('Erreur suppression dossier:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * IPC: Assigner un PDF à un dossier
+ */
+ipcMain.handle(IPC_CHANNELS.FOLDER_ASSIGN_PDF, async (event, { folderId, pdfPath }) => {
+  try {
+    await folderService.assignPdfToFolder(folderId, pdfPath);
+    const folders = folderService.getFolders();
+    return { success: true, folders };
+  } catch (error) {
+    console.error('Erreur assignation PDF à dossier:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * IPC: Désassigner un PDF d'un dossier
+ */
+ipcMain.handle(IPC_CHANNELS.FOLDER_UNASSIGN_PDF, async (event, { folderId, pdfPath }) => {
+  try {
+    await folderService.unassignPdfFromFolder(folderId, pdfPath);
+    const folders = folderService.getFolders();
+    return { success: true, folders };
+  } catch (error) {
+    console.error('Erreur désassignation PDF de dossier:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * IPC: Déplacer un dossier (changement de parent)
+ */
+ipcMain.handle(IPC_CHANNELS.FOLDER_MOVE, async (event, { id, newParentId }) => {
+  try {
+    const folder = await folderService.updateFolder(id, { parentId: newParentId });
+    const folders = folderService.getFolders();
+    return { success: true, folder, folders };
+  } catch (error) {
+    console.error('Erreur déplacement dossier:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * IPC: Renommer un dossier
+ */
+ipcMain.handle(IPC_CHANNELS.FOLDER_RENAME, async (event, { id, newName }) => {
+  try {
+    const folder = await folderService.updateFolder(id, { name: newName });
+    const folders = folderService.getFolders();
+    return { success: true, folder, folders };
+  } catch (error) {
+    console.error('Erreur renommage dossier:', error);
     return { success: false, error: error.message };
   }
 });

@@ -24,6 +24,16 @@ const IPC_CHANNELS = {
   THUMBNAIL_GENERATE: 'thumbnail:generate',
   THUMBNAIL_GET: 'thumbnail:get',
 
+  // Gestion des dossiers
+  FOLDER_LOAD: 'folder:load',
+  FOLDER_CREATE: 'folder:create',
+  FOLDER_UPDATE: 'folder:update',
+  FOLDER_DELETE: 'folder:delete',
+  FOLDER_ASSIGN_PDF: 'folder:assign-pdf',
+  FOLDER_UNASSIGN_PDF: 'folder:unassign-pdf',
+  FOLDER_MOVE: 'folder:move',
+  FOLDER_RENAME: 'folder:rename',
+
   // Shell - liens externes
   SHELL_OPEN_EXTERNAL: 'shell:open-external',
 
@@ -44,13 +54,14 @@ const CONFIG = {
   THUMBNAIL_HEIGHT: 200,
   THUMBNAIL_QUALITY: 0.8,
   MAX_RECENT_PDFS: 20,
-  CONFIG_VERSION: '1.0'
+  CONFIG_VERSION: '1.1'
 };
 
 const DEFAULT_CONFIG = {
   version: CONFIG.CONFIG_VERSION,
   recentPdfs: [],
-  bookmarks: {}
+  bookmarks: {},
+  folders: {}
 };
 
 // Export pour usage dans Node.js (main process) - CommonJS
