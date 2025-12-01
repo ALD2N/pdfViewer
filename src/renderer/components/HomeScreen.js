@@ -30,7 +30,7 @@
         }
       }
 
-      return config.recentPdfs.filter(pdfPath => !assignedPdfs.has(pdfPath));
+      return config.recentPdfs.filter(pdf => !assignedPdfs.has(pdf.path));
     }, [config?.recentPdfs, folders]);
 
     return React.createElement('div', { className: 'home-screen' },

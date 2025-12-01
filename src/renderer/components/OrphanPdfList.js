@@ -13,17 +13,26 @@
     }, []);
 
     // Extraire le nom du fichier
-    const getFileName = (filePath) => {
-      if (typeof filePath !== 'string' || !filePath) {
-        return 'Fichier inconnu';
+    const getFileName = (pdf) => {
+      if (typeof pdf === 'object' && pdf.name) {
+        return pdf.name;
       }
-      const parts = filePath.split(/[/\\]/);
-      return parts[parts.length - 1] || 'Fichier inconnu';
+      if (typeof pdf === 'string') {
+        if (!pdf) return 'Fichier inconnu';
+        const parts = pdf.split(/[/\\]/);
+        return parts[parts.length - 1] || 'Fichier inconnu';
+      }
+      return 'Fichier inconnu';
     };
 
     // Tronquer le chemin
-    const truncatePath = (filePath, maxLength = 40) => {
-      if (typeof filePath !== 'string' || !filePath) {
+    const truncatePath = (pdf) => {
+      let filePath;
+      if (typeof pdf === 'object' && pdf.path) {
+        filePath = pdf.path;
+      } else if (typeof pdf === 'string') {
+        filePath = pdf;
+      } else {
         return 'Chemin inconnu';
       }
       if (filePath.length <= maxLength) return filePath;
@@ -36,18 +45,18 @@
       React.createElement('h3', null, 'PDFs orphelins'),
       orphanPdfs.length > 0
         ? React.createElement('div', { className: 'pdf-list' },
-            orphanPdfs.map(pdfPath => 
+            orphanPdfs.map(pdf => 
               React.createElement('div', {
-                key: pdfPath,
+                key: pdf.path || pdf,
                 className: 'pdf-item draggable',
                 draggable: true,
-                onDragStart: (e) => handleDragStart(e, pdfPath),
-                onClick: () => onOpenPdf(pdfPath)
+                onDragStart: (e) => handleDragStart(e, pdf.path || pdf),
+                onClick: () => onOpenPdf(pdf.path || pdf)
               },
                 React.createElement('div', { className: 'pdf-icon' }, '📄'),
                 React.createElement('div', { className: 'pdf-info' },
-                  React.createElement('div', { className: 'pdf-name' }, getFileName(pdfPath)),
-                  React.createElement('div', { className: 'pdf-path' }, truncatePath(pdfPath))
+                  React.createElement('div', { className: 'pdf-name' }, getFileName(pdf)),
+                  React.createElement('div', { className: 'pdf-path' }, truncatePath(pdf))
                 ),
                 React.createElement('div', { className: 'drag-handle' }, '⋮⋮')
               )
