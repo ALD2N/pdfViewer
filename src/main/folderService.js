@@ -68,6 +68,11 @@ class FolderService {
    * @returns {Promise<Object>} - Dossier créé
    */
   async createFolder(name, parentId) {
+    // Valider que le parent existe s'il est fourni
+    if (parentId && !this.folders[parentId]) {
+      throw new Error('Dossier parent non trouvé');
+    }
+
     if (!this.validateFolderName(name, parentId)) {
       throw new Error('Nom de dossier invalide ou déjà utilisé');
     }
@@ -83,7 +88,7 @@ class FolderService {
     this.folders[id] = folder;
 
     // Ajouter à childrenIds du parent
-    if (parentId && this.folders[parentId]) {
+    if (parentId) {
       this.folders[parentId].childrenIds.push(id);
     }
 
