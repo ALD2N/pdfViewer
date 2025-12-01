@@ -1600,6 +1600,14 @@ input:focus {
   transition: background-color 0.2s ease;
 }
 
+.folder-header.expandable {
+  cursor: pointer;
+}
+
+.folder-header.expandable:hover {
+  background-color: var(--bg-tertiary);
+}
+
 .folder-header.drag-over {
   background-color: var(--accent);
   color: var(--text-primary);

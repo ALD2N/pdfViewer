@@ -111,14 +111,15 @@
       const isDragOver = dragOverId === folderId;
 
       return React.createElement('div', { key: folderId, className: 'folder-node' },
-        React.createElement('div', {
-          className: `folder-header ${isDragOver ? 'drag-over' : ''}`,
-          onContextMenu: (e) => handleContextMenu(e, folderId),
-          onDrop: (e) => { handleDrop(e, folderId); setDragOverId(null); },
-          onDragOver: handleDragOver,
-          onDragEnter: (e) => handleDragEnter(e, folderId),
-          onDragLeave: handleDragLeave
-        },
+         React.createElement('div', {
+           className: `folder-header ${hasChildren ? 'expandable' : ''} ${isDragOver ? 'drag-over' : ''}`,
+           onContextMenu: (e) => handleContextMenu(e, folderId),
+           onClick: hasChildren ? () => onToggleExpand(folderId) : undefined,
+           onDrop: (e) => { handleDrop(e, folderId); setDragOverId(null); },
+           onDragOver: handleDragOver,
+           onDragEnter: (e) => handleDragEnter(e, folderId),
+           onDragLeave: handleDragLeave
+         },
           hasChildren && React.createElement('span', {
             className: `expand-icon ${isExpanded ? 'expanded' : 'collapsed'}`,
             onClick: (e) => { e.stopPropagation(); onToggleExpand(folderId); }
