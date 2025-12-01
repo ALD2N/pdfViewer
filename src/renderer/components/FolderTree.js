@@ -126,13 +126,13 @@
       closePdfContextMenu();
     }, [pdfContextMenu, folders, closePdfContextMenu]);
 
-    // Supprimer un PDF de l'application
-    const handleRemovePdfFromApp = useCallback(() => {
-      if (pdfContextMenu && onRemovePdf) {
-        onRemovePdf(pdfContextMenu.pdfPath);
+    // Sélectionner un dossier dans la modale
+    const handleSelectFolderForPdf = useCallback((folderId) => {
+      if (folderSelectModal && onAssignPdf) {
+        onAssignPdf(folderId, folderSelectModal.pdfPath);
       }
-      closePdfContextMenu();
-    }, [pdfContextMenu, onRemovePdf, closePdfContextMenu]);
+      setFolderSelectModal(null);
+    }, [folderSelectModal, onAssignPdf]);
 
     // Liste des dossiers disponibles pour la modale de sélection (excluant ceux où le PDF est déjà)
     const availableFoldersForSelect = useMemo(() => {
@@ -299,7 +299,12 @@
           }, 'Retirer du dossier'),
           React.createElement('div', {
             className: 'context-menu-item delete',
-            onClick: handleRemovePdfFromApp
+            onClick: () => {
+              if (pdfContextMenu && onRemovePdf) {
+                onRemovePdf(pdfContextMenu.pdfPath);
+              }
+              closePdfContextMenu();
+            }
           }, 'Supprimer')
         )
       ),
