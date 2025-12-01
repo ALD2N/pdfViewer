@@ -17,6 +17,7 @@
     onUpdateFolder,
     onDeleteFolder,
     onAssignPdf,
+    onUnassignPdf,
     onToggleExpand
   }) {
     // Calculer les PDFs orphelins (non assignés à aucun dossier)
@@ -50,6 +51,7 @@
             onUpdateFolder: onUpdateFolder,
             onDeleteFolder: onDeleteFolder,
             onAssignPdf: onAssignPdf,
+            onUnassignPdf: onUnassignPdf,
             expandedFolders: expandedFolders,
             onToggleExpand: onToggleExpand,
             onOpenPdf: onOpenPdf

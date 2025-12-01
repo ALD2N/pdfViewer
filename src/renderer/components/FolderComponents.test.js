@@ -298,6 +298,7 @@ describe('Folder Components', () => {
         onUpdateFolder: jest.fn(),
         onDeleteFolder: jest.fn(),
         onAssignPdf: jest.fn(),
+        onUnassignPdf: jest.fn(),
         onToggleExpand: jest.fn()
       };
 
@@ -307,6 +308,220 @@ describe('Folder Components', () => {
       expect(screen.getByText('Dossiers')).toBeInTheDocument();
       expect(screen.getByText('PDFs orphelins')).toBeInTheDocument();
       expect(screen.getByText('PDFs récents')).toBeInTheDocument();
+    });
+  });
+
+  describe('PDF Context Menu in FolderTree', () => {
+    test('Right-click on PDF shows context menu', () => {
+      const mockFolders = {
+        'folder1': {
+          name: 'Test Folder',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: ['/test.pdf']
+        }
+      };
+
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        onUnassignPdf: jest.fn(),
+        expandedFolders: new Set(['folder1']),
+        onToggleExpand: jest.fn(),
+        onOpenPdf: jest.fn()
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Find the PDF item and right-click
+      const pdfItem = screen.getByText('test.pdf').closest('.folder-pdf-item');
+      fireEvent.contextMenu(pdfItem);
+
+      // Verify context menu options are displayed
+      expect(screen.getByText('Ajouter à un autre dossier')).toBeInTheDocument();
+      expect(screen.getByText('Retirer du dossier')).toBeInTheDocument();
+    });
+
+    test('Click "Retirer du dossier" calls onUnassignPdf', () => {
+      const mockFolders = {
+        'folder1': {
+          name: 'Test Folder',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: ['/test.pdf']
+        }
+      };
+
+      const onUnassignPdf = jest.fn();
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        onUnassignPdf,
+        expandedFolders: new Set(['folder1']),
+        onToggleExpand: jest.fn(),
+        onOpenPdf: jest.fn()
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Right-click on PDF
+      const pdfItem = screen.getByText('test.pdf').closest('.folder-pdf-item');
+      fireEvent.contextMenu(pdfItem);
+
+      // Click "Retirer du dossier"
+      fireEvent.click(screen.getByText('Retirer du dossier'));
+
+      expect(onUnassignPdf).toHaveBeenCalledWith('folder1', '/test.pdf');
+    });
+
+    test('Click "Ajouter à un autre dossier" shows folder selection modal', () => {
+      const mockFolders = {
+        'folder1': {
+          name: 'Test Folder',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: ['/test.pdf']
+        },
+        'folder2': {
+          name: 'Other Folder',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: []
+        }
+      };
+
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        onUnassignPdf: jest.fn(),
+        expandedFolders: new Set(['folder1']),
+        onToggleExpand: jest.fn(),
+        onOpenPdf: jest.fn()
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Right-click on PDF
+      const pdfItem = screen.getByText('test.pdf').closest('.folder-pdf-item');
+      fireEvent.contextMenu(pdfItem);
+
+      // Click "Ajouter à un autre dossier"
+      fireEvent.click(screen.getByText('Ajouter à un autre dossier'));
+
+      // Verify folder selection modal appears
+      expect(screen.getByText('Sélectionner un dossier')).toBeInTheDocument();
+      // Only folders NOT containing the PDF should be shown in the modal
+      const modal = document.querySelector('.folder-select-modal');
+      expect(modal).toBeInTheDocument();
+      const folderSelectItem = modal.querySelector('.folder-select-name');
+      expect(folderSelectItem.textContent).toBe('Other Folder');
+    });
+
+    test('Folder selection modal excludes current folders', () => {
+      const mockFolders = {
+        'folder1': {
+          name: 'Folder A',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: ['/test.pdf']
+        },
+        'folder2': {
+          name: 'Folder B',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: ['/test.pdf'] // Also contains the PDF
+        },
+        'folder3': {
+          name: 'Folder C',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: [] // Does not contain the PDF
+        }
+      };
+
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        onUnassignPdf: jest.fn(),
+        expandedFolders: new Set(['folder1']),
+        onToggleExpand: jest.fn(),
+        onOpenPdf: jest.fn()
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Right-click on PDF in folder1
+      const pdfItem = screen.getByText('test.pdf').closest('.folder-pdf-item');
+      fireEvent.contextMenu(pdfItem);
+
+      // Click "Ajouter à un autre dossier"
+      fireEvent.click(screen.getByText('Ajouter à un autre dossier'));
+
+      // Only Folder C should be in the selection list (inside modal)
+      const modal = document.querySelector('.folder-select-modal');
+      const folderSelectNames = modal.querySelectorAll('.folder-select-name');
+      
+      // Should only have one folder in the list
+      expect(folderSelectNames.length).toBe(1);
+      expect(folderSelectNames[0].textContent).toBe('Folder C');
+    });
+
+    test('Selecting folder in modal calls onAssignPdf', () => {
+      const mockFolders = {
+        'folder1': {
+          name: 'Test Folder',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: ['/test.pdf']
+        },
+        'folder2': {
+          name: 'Other Folder',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: []
+        }
+      };
+
+      const onAssignPdf = jest.fn();
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf,
+        onUnassignPdf: jest.fn(),
+        expandedFolders: new Set(['folder1']),
+        onToggleExpand: jest.fn(),
+        onOpenPdf: jest.fn()
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Right-click on PDF
+      const pdfItem = screen.getByText('test.pdf').closest('.folder-pdf-item');
+      fireEvent.contextMenu(pdfItem);
+
+      // Click "Ajouter à un autre dossier"
+      fireEvent.click(screen.getByText('Ajouter à un autre dossier'));
+
+      // Select folder in modal (click on the folder-select-item)
+      const modal = document.querySelector('.folder-select-modal');
+      const folderSelectItem = modal.querySelector('.folder-select-item');
+      fireEvent.click(folderSelectItem);
+
+      expect(onAssignPdf).toHaveBeenCalledWith('folder2', '/test.pdf');
     });
   });
 });

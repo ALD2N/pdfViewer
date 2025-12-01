@@ -162,6 +162,19 @@
       }
     }, []);
 
+    const unassignPdfFromFolder = useCallback(async (folderId, pdfPath) => {
+      try {
+        const result = await window.electronAPI.unassignPdfFromFolder({ folderId, pdfPath });
+        if (result.success) {
+          setFolders(result.folders);
+        } else {
+          console.error(result.error);
+        }
+      } catch (error) {
+        console.error('Erreur désassignation PDF:', error);
+      }
+    }, []);
+
     // Gestion de l'expansion des dossiers
     const toggleFolderExpansion = useCallback((folderId) => {
       setExpandedFolders(prev => {
@@ -197,6 +210,7 @@
             onUpdateFolder: updateFolder,
             onDeleteFolder: deleteFolder,
             onAssignPdf: assignPdfToFolder,
+            onUnassignPdf: unassignPdfFromFolder,
             onToggleExpand: toggleFolderExpansion
           })
         : React.createElement(window.PdfViewer, {
