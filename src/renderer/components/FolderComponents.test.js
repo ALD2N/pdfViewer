@@ -292,6 +292,39 @@ describe('Folder Components', () => {
       input = document.querySelector('input[type="text"]');
       expect(input.value).toBe('');
     });
+
+    test('Input resets after typing and canceling modal', () => {
+      const mockProps = {
+        folders: {},
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        expandedFolders: new Set(),
+        onToggleExpand: jest.fn()
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Ouvrir la modale
+      const createButton = screen.getByText('+ Nouveau dossier');
+      fireEvent.click(createButton);
+
+      // Taper du texte dans l'input
+      let input = document.querySelector('input[type="text"]');
+      fireEvent.change(input, { target: { value: 'Mon dossier test' } });
+      expect(input.value).toBe('Mon dossier test');
+
+      // Fermer la modale via "Annuler"
+      fireEvent.click(screen.getByText('Annuler'));
+
+      // Réouvrir la modale
+      fireEvent.click(createButton);
+
+      // L'input doit être vide (réinitialisé)
+      input = document.querySelector('input[type="text"]');
+      expect(input.value).toBe('');
+    });
   });
 
   describe('OrphanPdfList Component', () => {
