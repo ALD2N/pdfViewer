@@ -17,15 +17,13 @@
       e.preventDefault();
       e.stopPropagation();
 
-      const template = [
-        {
-          label: 'Supprimer',
-          click: () => onRemovePdf(pdfPath)
+      window.electronAPI.showDeleteContextMenu('pdf', pdfPath).then((result) => {
+        if (result.action === 'delete') {
+          onRemovePdf(pdfPath);
         }
-      ];
-
-      const menu = window.electronAPI.Menu.buildFromTemplate(template);
-      menu.popup();
+      }).catch((error) => {
+        console.error('Erreur menu contextuel:', error);
+      });
     }, [onRemovePdf]);
 
     // Extraire le nom du fichier

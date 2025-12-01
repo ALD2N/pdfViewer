@@ -139,15 +139,13 @@
       e.preventDefault();
       e.stopPropagation();
 
-      const template = [
-        {
-          label: 'Supprimer',
-          click: () => onDelete(bookmark.id)
+      window.electronAPI.showDeleteContextMenu('bookmark', bookmark.id).then((result) => {
+        if (result.action === 'delete') {
+          onDelete(bookmark.id);
         }
-      ];
-
-      const menu = window.electronAPI.Menu.buildFromTemplate(template);
-      menu.popup();
+      }).catch((error) => {
+        console.error('Erreur menu contextuel:', error);
+      });
     }, [onDelete]);
 
     const sectionClassName = `bookmarks-section ${displayMode === DISPLAY_MODES.COMPACT ? 'compact-mode' : 'thumbnails-mode'}`;

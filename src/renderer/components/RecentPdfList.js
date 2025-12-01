@@ -47,20 +47,23 @@
       }
     }, [confirmRemove, onRemovePdf]);
 
+    // Annuler le retrait
+    const cancelRemove = useCallback(() => {
+      setConfirmRemove(null);
+    }, []);
+
     // Gérer le clic droit pour le menu contextuel
     const handleContextMenu = useCallback((e, pdfPath) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const template = [
-        {
-          label: 'Supprimer',
-          click: () => askRemoveConfirmation(pdfPath)
+      window.electronAPI.showDeleteContextMenu('pdf', pdfPath).then((result) => {
+        if (result.action === 'delete') {
+          askRemoveConfirmation(pdfPath);
         }
-      ];
-
-      const menu = window.electronAPI.Menu.buildFromTemplate(template);
-      menu.popup({ window: require('electron').remote.getCurrentWindow() });
+      }).catch((error) => {
+        console.error('Erreur menu contextuel:', error);
+      });
     }, [askRemoveConfirmation]);
 
     return React.createElement('div', { className: 'recent-pdf-list' },

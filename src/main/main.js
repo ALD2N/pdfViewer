@@ -3,7 +3,7 @@
  * Gère les opérations système, la persistance et les IPC
  */
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs-extra');
 const crypto = require('crypto');
@@ -513,6 +513,30 @@ ipcMain.handle('shell:open-external', async (event, url) => {
     console.error('Erreur ouverture URL externe:', error);
     return { success: false, error: error.message };
   }
+});
+
+/**
+ * IPC: Afficher un menu contextuel de suppression
+ * Retourne l'action choisie par l'utilisateur
+ */
+ipcMain.handle('context-menu:show-delete', async (event, { type, id }) => {
+  return new Promise((resolve) => {
+    const template = [
+      {
+        label: 'Supprimer',
+        click: () => resolve({ action: 'delete', type, id })
+      }
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    menu.popup({
+      window: mainWindow,
+      callback: () => {
+        // Appelé quand le menu se ferme sans sélection
+        resolve({ action: 'cancel' });
+      }
+    });
+  });
 });
 
 /**
