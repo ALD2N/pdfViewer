@@ -5,12 +5,28 @@
 (function() {
   const { useCallback } = React;
 
-  function OrphanPdfList({ orphanPdfs, onOpenPdf }) {
+  function OrphanPdfList({ orphanPdfs, onOpenPdf, onRemovePdf }) {
     // Gérer le drag start
     const handleDragStart = useCallback((e, pdfPath) => {
       e.dataTransfer.setData('text/plain', pdfPath);
       e.dataTransfer.effectAllowed = 'copy';
     }, []);
+
+    // Gérer le clic droit pour le menu contextuel
+    const handleContextMenu = useCallback((e, pdfPath) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const template = [
+        {
+          label: 'Supprimer',
+          click: () => onRemovePdf(pdfPath)
+        }
+      ];
+
+      const menu = window.electronAPI.Menu.buildFromTemplate(template);
+      menu.popup();
+    }, [onRemovePdf]);
 
     // Extraire le nom du fichier
     const getFileName = (pdf) => {
@@ -51,7 +67,8 @@
                 className: 'pdf-item draggable',
                 draggable: true,
                 onDragStart: (e) => handleDragStart(e, pdf.path || pdf),
-                onClick: () => onOpenPdf(pdf.path || pdf)
+                onClick: () => onOpenPdf(pdf.path || pdf),
+                onContextMenu: (e) => handleContextMenu(e, pdf.path || pdf)
               },
                 React.createElement('div', { className: 'pdf-icon' }, '📄'),
                 React.createElement('div', { className: 'pdf-info' },
