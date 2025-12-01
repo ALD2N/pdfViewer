@@ -26,7 +26,7 @@
     };
 
     // Tronquer le chemin
-    const truncatePath = (pdf) => {
+    const truncatePath = (pdf, maxLength = 40) => {
       let filePath;
       if (typeof pdf === 'object' && pdf.path) {
         filePath = pdf.path;
