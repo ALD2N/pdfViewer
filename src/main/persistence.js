@@ -157,12 +157,12 @@ class PersistenceService {
     return validated;
   }
 
-    console.log('[DEBUG] PersistenceService.saveConfig: Saving config');
   /**
    * Sauvegarde la configuration de manière atomique
    * RC1: Prévention de la perte de données
    */
   async saveConfig() {
+    console.log('[DEBUG] PersistenceService.saveConfig: Saving config');
     if (!this.config) return;
 
     try {
@@ -254,13 +254,13 @@ class PersistenceService {
    * Ajoute un bookmark
    * R5: Plusieurs bookmarks peuvent exister sur la même page
    * R6: Ordre chronologique par défaut
-    console.log('[DEBUG] PersistenceService.addBookmark: Adding bookmark for', pdfPath, 'page', bookmarkData.page);
    * INV-02: Titre non-vide (défaut "Page X")
    * @param {string} pdfPath - Chemin du PDF
    * @param {Object} bookmarkData - Données du bookmark
    * @returns {Promise<Object>} - Bookmark créé
    */
   async addBookmark(pdfPath, bookmarkData) {
+    console.log('[DEBUG] PersistenceService.addBookmark: Adding bookmark for', pdfPath, 'page', bookmarkData.page);
     if (!this.config.bookmarks[pdfPath]) {
       this.config.bookmarks[pdfPath] = {
         hash: null,
