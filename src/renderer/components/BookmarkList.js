@@ -11,7 +11,7 @@
     COMPACT: 'compact'
   };
 
-  function BookmarkList({ bookmarks, onNavigate, onPreview, onUpdate, onDelete, onReorder }) {
+  function BookmarkList({ bookmarks, onNavigate, onPreview, onUpdate, onDelete, onReorder, showHeader = true }) {
     const [editingId, setEditingId] = useState(null);
     const [editTitle, setEditTitle] = useState('');
     const [draggedIndex, setDraggedIndex] = useState(null);
@@ -138,7 +138,7 @@
     const listClassName = `bookmarks-list ${displayMode}`;
 
     return React.createElement('div', { className: sectionClassName },
-      React.createElement('div', { className: 'bookmarks-header' },
+      showHeader && React.createElement('div', { className: 'bookmarks-header' },
         React.createElement('div', { className: 'bookmarks-title' },
           `Bookmarks (${bookmarks.length})`
         ),

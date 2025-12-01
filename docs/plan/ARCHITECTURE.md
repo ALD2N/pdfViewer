@@ -36,6 +36,16 @@
 - **PersistenceService** : Accès données.
   - Méthodes : loadConfig(), saveConfig(data), validateHash(path, hash).
 
+## Module de Recherche
+
+Le surlignage des résultats de recherche est un requis obligatoire.
+
+- **SearchPanel.js** : Nouveau composant React pour l'interface utilisateur de recherche. Gère le formulaire de saisie, le bouton submit, l'indicateur de progression, et la liste des résultats de recherche. Intègre avec PdfViewer.js pour le toggle de mode.
+- **SearchService.js** : Nouveau service logique pour la recherche. Responsable de l'extraction du texte des pages via PDF.js, de l'exécution de la recherche (insensible casse, partielle), du formatage des résultats, et de la gestion des surlignages dans le TextLayer.
+- **Intégration dans PdfViewer.js** : Modifications pour ajouter le bouton toggle sidebar (Bookmarks/Recherche), gérer l'affichage exclusif des modes, intégrer la navigation et le surlignage lors de clic sur résultat. La fonction toggleSidebarMode() inclut la logique pour effacer les surlignages lors du basculement vers Bookmarks.
+
+Format des données SearchResult : Objet { pageNum: number, textIndex: number, match: string, contextBefore: string, contextAfter: string, fullContext: string } où fullContext est le contexte complet avec match en évidence.
+
 ## Dépendances
 
 - `electron` : Framework desktop.

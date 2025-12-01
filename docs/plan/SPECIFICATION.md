@@ -28,6 +28,42 @@ Le projet "PDF Viewer" est un visualiseur de PDF local intégré avec un systèm
 - **US5** : En tant qu'utilisateur, je veux voir une liste des bookmarks en bas de l'écran avec miniatures, titres, et boutons pour preview ou navigation, afin de gérer mes marques-pages.
 - **US6** : En tant qu'utilisateur, je veux pouvoir réorganiser les bookmarks par drag & drop et les supprimer, afin de personnaliser mon organisation.
 - **US7** : En tant qu'utilisateur, je veux que mes bookmarks soient sauvegardés automatiquement et récupérés à la réouverture du PDF, afin de ne pas perdre mon travail.
+- **US8** : En tant qu'utilisateur, je veux basculer entre mode "Bookmarks" et mode "Recherche" dans la sidebar, afin de changer de fonctionnalité.
+- **US9** : En tant qu'utilisateur, je veux saisir un terme de recherche et lancer la recherche, afin de trouver du texte dans le PDF.
+- **US10** : En tant qu'utilisateur, je veux voir les résultats de recherche avec contexte de 5 mots avant/après, afin de comprendre les occurrences.
+- **US11** : En tant qu'utilisateur, je veux cliquer sur un résultat pour naviguer vers la page et voir le surlignage, afin de localiser rapidement.
+- **US12** : En tant qu'utilisateur, je veux que la recherche soit insensible à la casse avec correspondances partielles, limitée à 100 résultats, sans historique.
+
+## Fonctionnalité de Recherche
+
+### Description
+
+Ajout d'une fonctionnalité de recherche textuelle dans les PDFs ouverts. Permet de rechercher du texte insensible à la casse avec correspondances partielles. Affiche jusqu'à 100 résultats avec contexte de 5 mots avant et après le match. Surligne les occurrences dans le PDF (obligatoire). Basculement exclusif entre mode "Bookmarks" et "Recherche" via un bouton dans la sidebar. Recherche déclenchée au submit (Enter ou bouton), avec indicateur de progression. Pas d'historique des recherches.
+
+### Flux fonctionnels
+
+#### Recherche simple
+1. Utilisateur bascule en mode "Recherche" via le bouton toggle dans la sidebar.
+2. Saisie du terme de recherche dans le formulaire.
+3. Submit de la recherche (Enter ou clic bouton).
+4. Extraction asynchrone du texte de toutes les pages via PDF.js.
+5. Recherche des correspondances partielles, insensible casse.
+6. Affichage des résultats (jusqu'à 100) avec contexte, triés par page.
+7. Indicateur de progression pendant la recherche.
+
+#### Navigation vers résultat
+1. Clic sur un résultat dans la liste.
+2. Navigation automatique vers la page correspondante.
+3. Surlignage du match dans le PDF via TextLayer.
+
+#### Retour aux bookmarks
+1. Basculement en mode "Bookmarks" via le toggle.
+2. Effacement des surlignages de recherche.
+3. Affichage de la liste des bookmarks.
+
+### Référence aux règles métier
+
+Voir R7 à R11 dans `docs/plan/REGLES_METIER.md`.
 
 ## Architecture technique (Electron + React + PDF.js)
 
@@ -112,7 +148,7 @@ Voir le document dédié `docs/plan/REGLES_METIER.md` pour les détails (R1-R6, 
 
 Voir le document dédié `docs/plan/RISQUES.md` pour l'analyse complète.
 
-## Estimation : 10 jours de développement
+## Estimation : 14 jours de développement
 
 Répartition estimée :
 - Jour 1-2 : Setup projet Electron + React + PDF.js.
@@ -120,4 +156,5 @@ Répartition estimée :
 - Jour 5-6 : Navigation et visualisation.
 - Jour 7-8 : Gestion bookmarks (CRUD, miniatures).
 - Jour 9 : Persistance et cache.
-- Jour 10 : Tests, optimisation, packaging.
+- Jour 10-13 : Fonctionnalité de recherche (SearchService, SearchPanel, intégration).
+- Jour 14 : Tests, optimisation, packaging.

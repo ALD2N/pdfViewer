@@ -27,6 +27,15 @@
     const [previewBookmark, setPreviewBookmark] = useState(null);
     const [isAddingBookmark, setIsAddingBookmark] = useState(false);
     
+    // États mode sidebar
+    const [sidebarMode, setSidebarMode] = useState('bookmarks'); // 'bookmarks' ou 'search'
+    
+    // États recherche
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [currentHighlights, setCurrentHighlights] = useState([]);
+    const [textLayerRefreshKey, setTextLayerRefreshKey] = useState(0);
+    
     // Refs pour la gestion des rendus (mutex/queue system)
     const pdfDocumentRef = useRef(null);
     const renderTaskRef = useRef(null);
@@ -38,6 +47,8 @@
     const isDestroyingRef = useRef(false);
     // NOUVEAU: AbortController pour les opérations asynchrones
     const abortControllerRef = useRef(null);
+    // NOUVEAU: Ref pour stocker currentPage et numPages pour les handlers d'événements
+    const navigationStateRef = useRef({ currentPage: 1, numPages: 0 });
 
     const attachViewerContentRef = useCallback((node) => {
       viewerContentRef.current = node;
@@ -46,6 +57,11 @@
 
     // Accès à PDF.js depuis window
     const pdfjsLib = window.pdfjsLib;
+
+    // NOUVEAU: Mettre à jour la ref de navigation quand les états changent
+    useEffect(() => {
+      navigationStateRef.current = { currentPage, numPages };
+    }, [currentPage, numPages]);
 
     // NOUVEAU: Fonction pour vérifier si le document est valide et non détruit
     const isDocumentValid = useCallback(() => {
@@ -126,7 +142,9 @@
         }
 
         // Validation: s'assurer que pageIndex est un nombre valide
-        if (isDocumentValid() && typeof pageIndex === 'number' && pageIndex >= 0 && pageIndex < numPages) {
+        // MODIFIÉ: Utiliser la ref pour numPages pour éviter les closures stales
+        const currentNumPages = navigationStateRef.current.numPages;
+        if (isDocumentValid() && typeof pageIndex === 'number' && pageIndex >= 0 && pageIndex < currentNumPages) {
           // PDF.js utilise des indices 0-based, notre state utilise 1-based
           setCurrentPage(pageIndex + 1);
         } else {
@@ -138,7 +156,7 @@
           console.warn('Erreur navigation lien interne:', error);
         }
       }
-    }, [numPages, isDocumentValid]);
+    }, [isDocumentValid]);
 
     /**
      * Gère le clic sur un lien externe - ouvre dans le navigateur par défaut
@@ -172,6 +190,132 @@
     }, []);
 
     /**
+     * Applique les surlignages de recherche dans la couche de texte.
+     * 
+     * ARCHITECTURE: Cette fonction reconstruit le texte exactement comme SearchService
+     * pour garantir l'alignement des index de matches avec les spans du TextLayer.
+     * 
+     * PDF.js TextLayer crée un span par item avec item.str comme textContent.
+     * Chaque span contient exactement item.str (sans modification).
+     * 
+     * SYNCHRONISATION: Utiliser la même logique de construction de texte que
+     * SearchService._buildTextAndOffsets() pour éviter tout décalage.
+     * 
+     * FILTRAGE ITEMS VIDES: PDF.js peut ignorer les items vides (str === '') lors de la génération
+     * du TextLayer. Nous devons également les filtrer pour maintenir la synchronisation.
+     * 
+     * @param {HTMLElement} textLayerDiv - Conteneur de la couche de texte
+     * @param {Object} textContent - Contenu texte de la page
+     * @param {Array} matches - Correspondances à surligner [{text, index}, ...]
+     */
+    const applyHighlights = useCallback((textLayerDiv, textContent, matches) => {
+      if (!textLayerDiv || !matches.length) return;
+
+      const spans = textLayerDiv.querySelectorAll('span');
+      if (!spans.length) return;
+
+      const items = textContent.items;
+
+      // NOUVEAU: Filtrer les items vides pour synchronisation avec PDF.js TextLayer
+      const filteredItems = items.filter(item => item.str !== '');
+
+      // Construire les offsets SANS espaces supplémentaires
+      // C'est la MÊME logique que SearchService._buildTextAndOffsets
+      let fullText = '';
+      const itemOffsets = [];
+
+      for (let i = 0; i < filteredItems.length; i++) {
+        const item = filteredItems[i];
+        const str = item.str || '';
+        
+        const start = fullText.length;
+        fullText += str;
+        const end = fullText.length;
+        
+        itemOffsets.push({ start, end });
+      }
+
+      // Vérification de cohérence : le nombre de spans devrait correspondre au nombre d'items filtrés
+      // Note: PDF.js génère un span par item non-vide uniquement
+      if (spans.length !== filteredItems.length) {
+        console.warn(
+          `Désynchronisation TextLayer détectée: ${filteredItems.length} items filtrés vs ${spans.length} spans. ` +
+          `Items totaux: ${items.length}. Tentative de surlignage avec alignement partiel.`
+        );
+        // Log de débogage pour comprendre la désynchronisation
+        console.debug('Items brut:', items.length);
+        console.debug('Items filtrés (non-vides):', filteredItems.length);
+        console.debug('Spans DOM:', spans.length);
+        
+        // Si la désynchronisation persiste malgré le filtrage, on continue avec le minimum
+        // pour éviter les erreurs d'index
+      }
+
+      // Traiter chaque match
+      matches.forEach(match => {
+        const matchIndex = match.index;
+        const matchEndIndex = matchIndex + match.text.length;
+
+        // Trouver les spans qui contiennent le match
+        // Itérer sur le minimum pour éviter les erreurs d'index
+        const maxIndex = Math.min(spans.length, itemOffsets.length);
+        
+        for (let i = 0; i < maxIndex; i++) {
+          const span = spans[i];
+          const { start: spanStart, end: spanEnd } = itemOffsets[i];
+
+          // Vérifier si le match chevauche ce span
+          // Le match est dans [matchIndex, matchEndIndex)
+          // Le span couvre [spanStart, spanEnd) dans fullText
+          if (matchIndex < spanEnd && matchEndIndex > spanStart) {
+            const spanText = span.textContent || '';
+            
+            // Vérification de cohérence : le span devrait avoir le même texte que l'item filtré
+            // Avec la nouvelle logique (filtrage items vides, sans espaces EOL), cette vérification devrait passer
+            const expectedLength = spanEnd - spanStart;
+            if (spanText.length !== expectedLength) {
+              // Désynchronisation détectée - log et skip ce span
+              console.warn(
+                `Désynchronisation span ${i}: ` +
+                `attendu ${expectedLength} chars ("${filteredItems[i].str}"), ` +
+                `trouvé ${spanText.length} chars ("${spanText}")`
+              );
+              continue;
+            }
+            
+            // Calculer la partie du match dans ce span
+            // en coordonnées relatives au span (0 = début du span)
+            const matchStartInSpan = Math.max(0, matchIndex - spanStart);
+            const matchEndInSpan = Math.min(spanText.length, matchEndIndex - spanStart);
+
+            if (matchStartInSpan < matchEndInSpan && matchStartInSpan < spanText.length) {
+              // Créer le surlignage
+              const beforeMatch = spanText.substring(0, matchStartInSpan);
+              const matchPart = spanText.substring(matchStartInSpan, matchEndInSpan);
+              const afterMatch = spanText.substring(matchEndInSpan);
+
+              // Reconstruire le contenu du span avec surlignage
+              span.textContent = '';
+              
+              if (beforeMatch) {
+                span.appendChild(document.createTextNode(beforeMatch));
+              }
+              
+              const highlightSpan = document.createElement('span');
+              highlightSpan.className = 'search-highlight';
+              highlightSpan.textContent = matchPart;
+              span.appendChild(highlightSpan);
+              
+              if (afterMatch) {
+                span.appendChild(document.createTextNode(afterMatch));
+              }
+            }
+          }
+        }
+      });
+    }, []);
+
+    /**
      * Rend la couche de texte pour permettre la sélection
      * @param {Object} page - Page PDF.js
      * @param {Object} viewport - Viewport calculé
@@ -202,6 +346,14 @@
         });
 
         await textLayer.render();
+
+        // Appliquer les surlignages de recherche si présents
+        // MODIFIÉ: Utiliser la ref pour currentPage
+        const pageNum = navigationStateRef.current.currentPage;
+        const pageHighlights = currentHighlights.find(h => h.page === pageNum);
+        if (pageHighlights && pageHighlights.matches.length > 0) {
+          applyHighlights(textLayerRef.current, textContent, pageHighlights.matches);
+        }
       } catch (error) {
         // MODIFIÉ: Ignorer les erreurs si le document est en cours de destruction
         if (error.name !== 'RenderingCancelledException' && isDocumentValid()) {
@@ -210,7 +362,7 @@
           }
         }
       }
-    }, [pdfjsLib, isDocumentValid]);
+    }, [pdfjsLib, isDocumentValid, currentHighlights, applyHighlights]);
 
     /**
      * Rend la couche d'annotations (liens, formulaires, etc.)
@@ -325,7 +477,7 @@
       } catch (error) {
         // MODIFIÉ: Ignorer les erreurs si le document est en cours de destruction
         if (isDocumentValid() && (!error.message || !error.message.includes('Transport destroyed'))) {
-          console.warn('Erreur rendu couche d\'annotations:', error);
+          console.warn("Erreur rendu couche d'annotations:", error);
         }
       }
     }, [pdfjsLib, handleInternalLink, handleExternalLink, isDocumentValid]);
@@ -491,8 +643,11 @@
     // R3: Persistance automatique
     // INV-02: Titre non-vide (défaut "Page X")
     const handleAddBookmark = useCallback(async () => {
+      // MODIFIÉ: Utiliser la ref pour obtenir les valeurs actuelles
+      const { currentPage: page, numPages: total } = navigationStateRef.current;
+      
       // MODIFIÉ: Vérification du document valide
-      if (isAddingBookmark || !isDocumentValid() || !currentPage || currentPage < 1 || currentPage > numPages) {
+      if (isAddingBookmark || !isDocumentValid() || !page || page < 1 || page > total) {
         console.warn('Impossible d\'ajouter un bookmark : PDF non chargé ou page invalide.');
         return;
       }
@@ -501,8 +656,8 @@
       
       try {
         // 1. Ajouter le bookmark immédiatement avec titre par défaut
-        const title = `Page ${currentPage}`;
-        const addResult = await window.electronAPI.addBookmark(pdfData.path, currentPage, title);
+        const title = `Page ${page}`;
+        const addResult = await window.electronAPI.addBookmark(pdfData.path, page, title);
         
         if (!addResult.success) {
           console.error(addResult.error || 'Erreur ajout bookmark');
@@ -515,7 +670,7 @@
         
         // 3. Générer la miniature de manière asynchrone
         // R2: Miniature obligatoire - on la génère après l'ajout
-        const thumbnailPath = await generateAndSaveThumbnail(currentPage);
+        const thumbnailPath = await generateAndSaveThumbnail(page);
         
         if (thumbnailPath) {
           // 4. Mettre à jour le bookmark avec le chemin de la miniature
@@ -523,7 +678,7 @@
             pdfData.path,
             addResult.bookmark.id,
             { thumbnailPath }
-);
+          );
           
           if (updateResult.success) {
             setBookmarks(updateResult.bookmarks);
@@ -537,16 +692,17 @@
       } finally {
         setIsAddingBookmark(false);
       }
-    }, [currentPage, numPages, pdfData.path, generateAndSaveThumbnail, isAddingBookmark, isDocumentValid]);
+    }, [pdfData.path, generateAndSaveThumbnail, isAddingBookmark, isDocumentValid]);
 
     // Callback pour naviguer vers un bookmark
     const handleNavigateToBookmark = useCallback((bookmark) => {
-      if (bookmark.page >= 1 && bookmark.page <= numPages) {
+      const { numPages: total } = navigationStateRef.current;
+      if (bookmark.page >= 1 && bookmark.page <= total) {
         setCurrentPage(bookmark.page);
       } else {
         console.warn('Page invalide pour le bookmark sélectionné');
       }
-    }, [numPages]);
+    }, []);
 
     // Callback pour preview un bookmark
     const handlePreviewBookmark = useCallback((bookmark) => {
@@ -610,6 +766,53 @@
       }
     }, [pdfData.path]);
 
+    // Callback pour lancer une recherche
+    const handleSearch = useCallback(async (query, onProgress) => {
+      if (!pdfDocumentRef.current) return;
+
+      setIsSearching(true);
+      setSearchResults([]);
+
+      try {
+        const results = await window.SearchService.search(query, pdfDocumentRef.current, onProgress);
+        setSearchResults(results);
+        
+        // Préparer les surlignages pour toutes les pages avec des correspondances
+        const highlights = results.map(result => ({
+          page: result.page,
+          matches: result.matches
+        }));
+        setCurrentHighlights(highlights);
+      } catch (error) {
+        console.error('Erreur recherche:', error);
+        setSearchResults([]);
+        setCurrentHighlights([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, []);
+
+    // Callback pour naviguer vers un résultat de recherche
+    const handleNavigateToSearchResult = useCallback((result) => {
+      if (!result) return;
+
+      const targetPage = Number(result.page);
+      const { numPages: total, currentPage: current } = navigationStateRef.current;
+      
+      if (!Number.isFinite(targetPage) || targetPage < 1 || targetPage > total) {
+        console.warn('Résultat de recherche invalide ou hors limites');
+        return;
+      }
+
+      if (targetPage !== current) {
+        setCurrentPage(targetPage);
+      }
+
+      if (viewerContentRef.current) {
+        viewerContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, []);
+
     // NOUVEAU: Fonction de nettoyage sécurisée du document PDF
     const cleanupPdfDocument = useCallback(async () => {
       // Marquer comme en cours de destruction
@@ -668,7 +871,14 @@
         }
         
         pdfDocumentRef.current = pdf;
-        setNumPages(pdf.numPages);
+        
+        // IMPORTANT: Mettre à jour numPages AVANT currentPage pour éviter les conditions de course
+        const totalPages = pdf.numPages;
+        setNumPages(totalPages);
+        
+        // Mettre à jour la ref immédiatement pour que les handlers aient les bonnes valeurs
+        navigationStateRef.current = { currentPage: 1, numPages: totalPages };
+        
         setCurrentPage(1);
         
         // Charger les bookmarks depuis pdfData
@@ -684,6 +894,7 @@
     }, [pdfData, zoom, queueRender, pdfjsLib, cleanupPdfDocument]);
 
     // Effet pour charger le PDF au montage
+    // MODIFIÉ: Supprimer loadPdf et cleanupPdfDocument des dépendances pour éviter les boucles
     useEffect(() => {
       if (pdfData) {
         loadPdf();
@@ -693,7 +904,8 @@
         // MODIFIÉ: Utiliser la fonction de nettoyage sécurisée
         cleanupPdfDocument();
       };
-    }, [pdfData, loadPdf, cleanupPdfDocument]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pdfData]);
 
     // Effet pour gérer le changement de page ou de zoom
     useEffect(() => {
@@ -701,6 +913,13 @@
         queueRender(currentPage, zoom);
       }
     }, [currentPage, zoom, numPages, queueRender, isDocumentValid]);
+
+    useEffect(() => {
+      if (!textLayerRefreshKey) return;
+      if (!isDocumentValid()) return;
+      cancelCurrentRender();
+      queueRender(currentPage, zoom);
+    }, [textLayerRefreshKey, currentPage, zoom, cancelCurrentRender, queueRender, isDocumentValid]);
 
     useEffect(() => {
       viewStateRef.current = { page: currentPage, zoom };
@@ -740,12 +959,22 @@
     }, [queueRender, viewerContentEl, isDocumentValid]);
 
     // === RACCOURCIS CLAVIER ===
+    // MODIFIÉ: Utiliser les refs pour éviter les problèmes de closure stale
     useEffect(() => {
       const handleKeyDown = (event) => {
-        // Ignorer si on est dans un input
-        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+        // Ignorer si on est dans un input ou textarea
+        const tagName = event.target.tagName.toUpperCase();
+        if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
           return;
         }
+        
+        // Ignorer si l'élément a contenteditable
+        if (event.target.isContentEditable) {
+          return;
+        }
+
+        // Récupérer les valeurs actuelles depuis la ref
+        const { currentPage: page, numPages: total } = navigationStateRef.current;
 
         if (event.ctrlKey || event.metaKey) {
           switch (event.key) {
@@ -773,11 +1002,15 @@
           switch (event.key) {
             case 'ArrowLeft':
               event.preventDefault();
-              if (currentPage > 1) setCurrentPage(prev => prev - 1);
+              if (page > 1) {
+                setCurrentPage(page - 1);
+              }
               break;
             case 'ArrowRight':
               event.preventDefault();
-              if (currentPage < numPages) setCurrentPage(prev => prev + 1);
+              if (page < total) {
+                setCurrentPage(page + 1);
+              }
               break;
             case 'Home':
               event.preventDefault();
@@ -785,7 +1018,9 @@
               break;
             case 'End':
               event.preventDefault();
-              setCurrentPage(numPages);
+              if (total > 0) {
+                setCurrentPage(total);
+              }
               break;
             case 'Escape':
               event.preventDefault();
@@ -801,7 +1036,7 @@
 
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentPage, numPages, onGoHome, handleAddBookmark, previewBookmark, handleClosePreview]);
+    }, [onGoHome, handleAddBookmark, previewBookmark, handleClosePreview]);
 
     // === COPIE AUTOMATIQUE DU TEXTE SÉLECTIONNÉ ===
     useEffect(() => {
@@ -893,7 +1128,7 @@
           React.createElement('button', {
             className: 'btn-icon',
             onClick: () => setCurrentPage(prev => Math.max(prev - 1, 1)),
-            disabled: currentPage === 1,
+            disabled: currentPage <= 1,
             title: 'Page précédente (←)'
           }, '◀'),
           React.createElement('div', { className: 'page-indicator' },
@@ -916,7 +1151,7 @@
           React.createElement('button', {
             className: 'btn-icon',
             onClick: () => setCurrentPage(prev => Math.min(prev + 1, numPages)),
-            disabled: currentPage === numPages,
+            disabled: currentPage >= numPages,
             title: 'Page suivante (→)'
           }, '▶')
         ),
@@ -933,14 +1168,41 @@
       React.createElement('div', { className: 'viewer-body' },
         // Section bookmarks (barre latérale)
         React.createElement('div', { className: 'bookmarks-sidebar' },
-          React.createElement(window.BookmarkList, {
-            bookmarks: bookmarks,
-            onNavigate: handleNavigateToBookmark,
-            onPreview: handlePreviewBookmark,
-            onUpdate: handleUpdateBookmark,
-            onDelete: handleDeleteBookmark,
-            onReorder: handleReorderBookmarks
-          })
+          // Header de la sidebar avec toggle
+          React.createElement('div', { className: 'sidebar-header' },
+            React.createElement('div', { className: 'sidebar-title' },
+              sidebarMode === 'bookmarks' ? `Bookmarks (${bookmarks.length})` : 'Recherche'
+            ),
+             React.createElement('button', {
+               className: 'btn-secondary btn-small mode-toggle-btn',
+               onClick: () => {
+                 const newMode = sidebarMode === 'bookmarks' ? 'search' : 'bookmarks';
+                 setSidebarMode(newMode);
+                 // Effacer les surlignages lors du changement vers bookmarks
+                 if (newMode === 'bookmarks') {
+                   setCurrentHighlights([]);
+                 }
+               },
+               title: sidebarMode === 'bookmarks' ? 'Passer en mode Recherche' : 'Passer en mode Bookmarks'
+             }, sidebarMode === 'bookmarks' ? '🔍' : '🔖')
+          ),
+          // Contenu de la sidebar
+          sidebarMode === 'bookmarks'
+            ? React.createElement(window.BookmarkList, {
+                bookmarks: bookmarks,
+                onNavigate: handleNavigateToBookmark,
+                onPreview: handlePreviewBookmark,
+                onUpdate: handleUpdateBookmark,
+                onDelete: handleDeleteBookmark,
+                onReorder: handleReorderBookmarks,
+                showHeader: false
+              })
+            : React.createElement(window.SearchPanel, {
+                onSearch: handleSearch,
+                onNavigateToResult: handleNavigateToSearchResult,
+                results: searchResults,
+                isSearching: isSearching
+              })
         ),
         React.createElement('div', { className: 'viewer-content', ref: attachViewerContentRef },
           isLoading ? React.createElement('div', { className: 'loading-overlay' },

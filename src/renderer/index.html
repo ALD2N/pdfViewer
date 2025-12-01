@@ -61,9 +61,11 @@
       try {
         console.log('🚀 Démarrage du chargement des composants...');
         
+        await loadScript('SearchService.js');
         await loadScript('components/BookmarkList.js');
         await loadScript('components/HomeScreen.js');
         await loadScript('components/PdfViewer.js');
+        await loadScript('components/SearchPanel.js');
         await loadScript('App.js');
         
         console.log('✅ Application chargée avec succès');

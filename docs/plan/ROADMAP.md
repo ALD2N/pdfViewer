@@ -11,7 +11,7 @@
 
 ## Phase 2 (version 1.1) - Évolutions mineures
 
-- Recherche textuelle dans le PDF.
+- Recherche textuelle dans le PDF (4 jours : implémentation SearchService.js pour logique extraction/recherche, SearchPanel.js pour UI, intégration dans PdfViewer.js pour toggle/surlignage/navigation, tests et optimisation performance).
 - Export des bookmarks en JSON/CSV.
 - Améliorations UX : raccourcis clavier (Ctrl+B pour bookmark).
 - Support thèmes clair/sombre switchable.
@@ -23,12 +23,12 @@
 - Synchronisation cloud des bookmarks.
 - Mode présentation (plein écran, navigation auto).
 
-## Estimation de charge (10 jours total)
+## Estimation de charge (14 jours total)
 
-- **Total** : 10 jours développeur (1 personne).
-- **MVP** : 7 jours (70% effort).
-- **Phase 2** : 1.5 jours.
-- **Phase 3** : 1.5 jours.
+- **Total** : 14 jours développeur (1 personne).
+- **MVP** : 7 jours (50% effort).
+- **Phase 2** : 5 jours (recherche 4j + autres 1j).
+- **Phase 3** : 2 jours.
 - Répartition par tâche : Voir SPECIFICATION.md.
 
 ## Jalons et livrables
