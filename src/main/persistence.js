@@ -436,7 +436,8 @@ class PersistenceService {
    * Sauvegarde les dossiers dans la configuration
    * R18: Persistance automatique des dossiers
    */
-  async saveFolders() {
+  async saveFolders(folders) {
+    this.config.folders = { ...folders };
     this.scheduleSave();
   }
 }

@@ -92,7 +92,7 @@ class FolderService {
       this.folders[parentId].childrenIds.push(id);
     }
 
-    await this.persistence.saveFolders();
+    await this.persistence.saveFolders(this.folders);
     return { id, ...folder };
   }
 
@@ -133,7 +133,7 @@ class FolderService {
       folder.parentId = updates.parentId;
     }
 
-    await this.persistence.saveFolders();
+    await this.persistence.saveFolders(this.folders);
     return { id, ...folder };
   }
 
@@ -163,7 +163,7 @@ class FolderService {
     // Les PDFs restent dans d'autres dossiers ou deviennent orphelins
 
     delete this.folders[id];
-    await this.persistence.saveFolders();
+    await this.persistence.saveFolders(this.folders);
   }
 
   /**
@@ -182,7 +182,7 @@ class FolderService {
 
     if (!folder.pdfPaths.includes(pdfPath)) {
       folder.pdfPaths.push(pdfPath);
-      await this.persistence.saveFolders();
+      await this.persistence.saveFolders(this.folders);
     }
   }
 
@@ -199,7 +199,7 @@ class FolderService {
     }
 
     folder.pdfPaths = folder.pdfPaths.filter(path => path !== pdfPath);
-    await this.persistence.saveFolders();
+    await this.persistence.saveFolders(this.folders);
   }
 
   /**
