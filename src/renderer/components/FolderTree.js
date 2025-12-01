@@ -112,15 +112,15 @@
 
       return React.createElement('div', { key: folderId, className: 'folder-node' },
          React.createElement('div', {
-           className: `folder-header ${hasChildren ? 'expandable' : ''} ${isDragOver ? 'drag-over' : ''}`,
+            className: `folder-header ${(hasChildren || hasPdfs) ? 'expandable' : ''} ${isDragOver ? 'drag-over' : ''}`,
            onContextMenu: (e) => handleContextMenu(e, folderId),
-           onClick: hasChildren ? () => onToggleExpand(folderId) : undefined,
+            onClick: (hasChildren || hasPdfs) ? () => onToggleExpand(folderId) : undefined,
            onDrop: (e) => { handleDrop(e, folderId); setDragOverId(null); },
            onDragOver: handleDragOver,
            onDragEnter: (e) => handleDragEnter(e, folderId),
            onDragLeave: handleDragLeave
          },
-          hasChildren && React.createElement('span', {
+           (hasChildren || hasPdfs) && React.createElement('span', {
             className: `expand-icon ${isExpanded ? 'expanded' : 'collapsed'}`,
             onClick: (e) => { e.stopPropagation(); onToggleExpand(folderId); }
           }),

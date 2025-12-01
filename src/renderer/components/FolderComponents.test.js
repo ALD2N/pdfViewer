@@ -107,13 +107,13 @@ describe('Folder Components', () => {
       expect(onToggleExpand).toHaveBeenCalledWith('parent');
     });
 
-    test('Click on folder line does not toggle for folders without children', () => {
+    test('Click on folder line does not toggle for folders without children and without PDFs', () => {
       const mockFolders = {
         'folder1': {
           name: 'Leaf Folder',
           parentId: null,
           childrenIds: [],
-          pdfPaths: ['/test.pdf']
+          pdfPaths: []
         }
       };
 
