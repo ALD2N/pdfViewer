@@ -69,7 +69,10 @@
               },
                 React.createElement('div', { className: 'pdf-icon' }, exists ? '📄' : '❌'),
                 React.createElement('div', { className: 'pdf-info' },
-                  React.createElement('div', { className: 'pdf-name' }, getFileName(pdfPath)),
+                  React.createElement(window.TruncatedText, {
+                    className: 'pdf-name',
+                    text: getFileName(pdfPath)
+                  }),
                   React.createElement('div', { className: 'pdf-path' }, truncatePath(pdfPath)),
                   !exists && React.createElement('div', { className: 'missing-note' }, 'Fichier introuvable')
                 ),

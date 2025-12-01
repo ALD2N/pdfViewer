@@ -15,6 +15,7 @@ global.React = React;
 
 // Load actual components
 require('./FolderTree.js');
+require('./TruncatedText.js');
 require('./OrphanPdfList.js');
 require('./RecentPdfList.js');
 require('./HomeScreen.js');

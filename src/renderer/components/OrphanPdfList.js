@@ -55,7 +55,10 @@
               },
                 React.createElement('div', { className: 'pdf-icon' }, '📄'),
                 React.createElement('div', { className: 'pdf-info' },
-                  React.createElement('div', { className: 'pdf-name' }, getFileName(pdf)),
+                  React.createElement(window.TruncatedText, {
+                    className: 'pdf-name',
+                    text: getFileName(pdf)
+                  }),
                   React.createElement('div', { className: 'pdf-path' }, truncatePath(pdf))
                 ),
                 React.createElement('div', { className: 'drag-handle' }, '⋮⋮')
