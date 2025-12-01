@@ -236,6 +236,7 @@
       React.createElement('button', {
         className: 'btn-secondary create-root-btn',
         onClick: () => {
+          setModalValue('');
           setModal({
             type: 'prompt',
             title: 'Nom du nouveau dossier racine:',

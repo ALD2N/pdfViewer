@@ -213,6 +213,85 @@ describe('Folder Components', () => {
       expect(onToggleExpand).toHaveBeenCalledTimes(1);
       expect(onToggleExpand).toHaveBeenCalledWith('parent');
     });
+
+    test('Click "+ Nouveau dossier" opens modal with empty input', () => {
+      const mockProps = {
+        folders: {},
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        expandedFolders: new Set(),
+        onToggleExpand: jest.fn()
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Cliquer sur le bouton "+ Nouveau dossier"
+      const createButton = screen.getByText('+ Nouveau dossier');
+      fireEvent.click(createButton);
+
+      // Vérifier que la modale s'ouvre
+      expect(screen.getByText('Nom du nouveau dossier racine:')).toBeInTheDocument();
+
+      // Vérifier que l'input est vide
+      const input = document.querySelector('input[type="text"]');
+      expect(input).toBeInTheDocument();
+      expect(input.value).toBe('');
+    });
+
+    test('Opening multiple modals resets input each time', () => {
+      const mockFolders = {
+        'folder1': {
+          name: 'Test Folder',
+          parentId: null,
+          childrenIds: [],
+          pdfPaths: []
+        }
+      };
+
+      const mockProps = {
+        folders: mockFolders,
+        onCreateFolder: jest.fn(),
+        onUpdateFolder: jest.fn(),
+        onDeleteFolder: jest.fn(),
+        onAssignPdf: jest.fn(),
+        expandedFolders: new Set(),
+        onToggleExpand: jest.fn()
+      };
+
+      render(React.createElement(window.FolderTree, mockProps));
+
+      // Première ouverture : bouton "+ Nouveau dossier"
+      const createButton = screen.getByText('+ Nouveau dossier');
+      fireEvent.click(createButton);
+
+      let input = document.querySelector('input[type="text"]');
+      expect(input.value).toBe('');
+
+      // Fermer la modale
+      fireEvent.click(screen.getByText('Annuler'));
+
+      // Ouvrir le menu contextuel et créer un sous-dossier
+      const folderHeader = screen.getByText('Test Folder').closest('.folder-header');
+      fireEvent.contextMenu(folderHeader);
+
+      fireEvent.click(screen.getByText('Créer sous-dossier'));
+
+      // Vérifier que l'input est vide pour le sous-dossier
+      input = document.querySelector('input[type="text"]');
+      expect(input.value).toBe('');
+
+      // Fermer la modale
+      fireEvent.click(screen.getByText('Annuler'));
+
+      // Ouvrir à nouveau "+ Nouveau dossier"
+      fireEvent.click(createButton);
+
+      // Vérifier que l'input est encore vide
+      input = document.querySelector('input[type="text"]');
+      expect(input.value).toBe('');
+    });
   });
 
   describe('OrphanPdfList Component', () => {
