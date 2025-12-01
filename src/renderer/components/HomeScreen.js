@@ -1,137 +1,87 @@
 /**
- * HomeScreen.js - Écran d'accueil avec liste des PDFs récents
- * Permet d'ouvrir un nouveau PDF ou de reprendre un PDF récent
+ * HomeScreen.js - Écran d'accueil avec organisation en dossiers
+ * Layout 3 colonnes : arborescence, orphelins, récents
  */
 
 (function() {
-  const { useState, useCallback } = React;
+  const { useMemo } = React;
 
-  function HomeScreen({ config, onOpenPdf, onOpenDialog, onRemovePdf }) {
-    const [confirmRemove, setConfirmRemove] = useState(null); // pdfPath à confirmer ou null
+  function HomeScreen({
+    config,
+    folders,
+    expandedFolders,
+    onOpenPdf,
+    onOpenDialog,
+    onRemovePdf,
+    onCreateFolder,
+    onUpdateFolder,
+    onDeleteFolder,
+    onAssignPdf,
+    onUnassignPdf,
+    onToggleExpand
+  }) {
+    // Calculer les PDFs orphelins (non assignés à aucun dossier)
+    const orphanPdfs = useMemo(() => {
+      if (!config?.recentPdfs) return [];
 
-    const recentPdfs = config?.recentPdfs || [];
-
-    // Extraire le nom du fichier depuis le chemin
-    // Gère les cas où filePath n'est pas une string valide (INV-05, R4)
-    const getFileName = (filePath) => {
-      // Vérification de type : filePath doit être une string non vide
-      if (typeof filePath !== 'string' || !filePath) {
-        return 'Fichier inconnu';
+      const assignedPdfs = new Set();
+      for (const folder of Object.values(folders || {})) {
+        for (const pdfPath of folder.pdfPaths || []) {
+          assignedPdfs.add(pdfPath);
+        }
       }
-      const parts = filePath.split(/[/\\]/);
-      const fileName = parts[parts.length - 1];
-      // Fallback si le split retourne un élément vide (ex: chemin terminant par /)
-      return fileName || 'Fichier inconnu';
-    };
 
-    // Tronquer le chemin pour l'affichage
-    // Gère les cas où filePath n'est pas une string valide (INV-05, R4)
-    const truncatePath = (filePath, maxLength = 50) => {
-      // Vérification de type : filePath doit être une string non vide
-      if (typeof filePath !== 'string' || !filePath) {
-        return 'Chemin inconnu';
-      }
-      if (filePath.length <= maxLength) return filePath;
-      const start = filePath.substring(0, 20);
-      const end = filePath.substring(filePath.length - 25);
-      return `${start}...${end}`;
-    };
-
-    // Gérer le clic sur un PDF
-    const handlePdfClick = useCallback((pdfPath) => {
-      onOpenPdf(pdfPath);
-    }, [onOpenPdf]);
-
-    // Demander confirmation de retrait
-    const askRemoveConfirmation = useCallback((e, pdfPath) => {
-      e.stopPropagation();
-      setConfirmRemove(pdfPath);
-    }, []);
-
-    // Confirmer le retrait
-    const confirmRemoveAction = useCallback(() => {
-      if (confirmRemove) {
-        onRemovePdf(confirmRemove);
-        setConfirmRemove(null);
-      }
-    }, [confirmRemove, onRemovePdf]);
-
-    // Annuler le retrait
-    const cancelRemove = useCallback(() => {
-      setConfirmRemove(null);
-    }, []);
+      return config.recentPdfs.filter(pdf => !assignedPdfs.has(pdf.path));
+    }, [config?.recentPdfs, folders]);
 
     return React.createElement('div', { className: 'home-screen' },
       // En-tête
       React.createElement('header', { className: 'home-header' },
         React.createElement('h1', null, '📄 PDF Viewer'),
-        React.createElement('p', null, 'Visualiseur de PDF avec système de bookmarks')
+        React.createElement('p', null, 'Organisez vos PDFs dans des dossiers virtuels')
       ),
 
-      // Liste des PDFs récents
-      React.createElement('section', { className: 'recent-pdfs' },
-        React.createElement('h2', { className: 'recent-pdfs-title' }, 'PDFs récents'),
-        
-        recentPdfs.length > 0
-          ? React.createElement('div', { className: 'pdf-list' },
-              recentPdfs.map((item, index) => {
-                const pdfPath = typeof item === 'object' && item.path ? item.path : item;
-                return React.createElement('div', {
-                  key: pdfPath || `pdf-${index}`,
-                  className: 'pdf-item',
-                  onClick: () => handlePdfClick(pdfPath)
-                },
-                  React.createElement('div', { className: 'pdf-icon' }, 'PDF'),
-                  React.createElement('div', { className: 'pdf-info' },
-                    React.createElement('div', { className: 'pdf-name' }, getFileName(pdfPath)),
-                    React.createElement('div', { className: 'pdf-path' }, truncatePath(pdfPath))
-                  ),
-                  React.createElement('div', { className: 'pdf-actions' },
-                    React.createElement('button', {
-                      className: 'btn-danger',
-                      onClick: (e) => askRemoveConfirmation(e, pdfPath),
-                      title: 'Retirer de la liste et supprimer les données associées (bookmarks, miniatures)'
-                    }, '🗑️ Retirer')
-                  )
-                );
-              })
-            )
-          : React.createElement('div', { className: 'empty-state' },
-              React.createElement('div', { className: 'empty-state-icon' }, '📄'),
-              React.createElement('p', null, 'Aucun PDF récent'),
-              React.createElement('p', null, 'Ouvrez un PDF pour commencer')
-            )
+      // Layout 3 colonnes
+      React.createElement('div', { className: 'home-layout' },
+        // Colonne 1: Arborescence des dossiers
+        React.createElement('div', { className: 'column folder-tree-column' },
+          React.createElement(window.FolderTree, {
+            folders: folders || {},
+            onCreateFolder: onCreateFolder,
+            onUpdateFolder: onUpdateFolder,
+            onDeleteFolder: onDeleteFolder,
+            onAssignPdf: onAssignPdf,
+            onUnassignPdf: onUnassignPdf,
+            expandedFolders: expandedFolders,
+            onToggleExpand: onToggleExpand,
+            onOpenPdf: onOpenPdf
+          })
+        ),
+
+        // Colonne 2: PDFs orphelins
+        React.createElement('div', { className: 'column orphan-pdfs-column' },
+          React.createElement(window.OrphanPdfList, {
+            orphanPdfs: orphanPdfs,
+            onOpenPdf: onOpenPdf
+          })
+        ),
+
+        // Colonne 3: PDFs récents
+        React.createElement('div', { className: 'column recent-pdfs-column' },
+          React.createElement(window.RecentPdfList, {
+            recentPdfs: config?.recentPdfs || [],
+            onOpenPdf: onOpenPdf,
+            onRemovePdf: onRemovePdf
+          })
+        )
       ),
 
-      // Actions
+      // Actions globales
       React.createElement('footer', { className: 'home-actions' },
         React.createElement('button', {
           className: 'btn-primary open-pdf-btn',
           onClick: onOpenDialog
         }, '📂 Ouvrir un PDF')
-      ),
-
-      // Dialog de confirmation
-      confirmRemove && React.createElement('div', { className: 'confirm-overlay' },
-        React.createElement('div', { className: 'confirm-modal' },
-          React.createElement('h3', null, 'Retirer ce PDF ?'),
-          React.createElement('p', null, 
-            'Ce PDF sera retiré de la liste et toutes les données associées (bookmarks, miniatures) seront supprimées.'
-          ),
-          React.createElement('p', { className: 'confirm-note' }, 
-            'Le fichier PDF restera sur votre disque.'
-          ),
-          React.createElement('div', { className: 'confirm-actions' },
-            React.createElement('button', {
-              className: 'confirm-btn btn-secondary',
-              onClick: cancelRemove
-            }, 'Annuler'),
-            React.createElement('button', {
-              className: 'confirm-btn btn-danger',
-              onClick: confirmRemoveAction
-            }, 'Retirer')
-          )
-        )
       )
     );
   }

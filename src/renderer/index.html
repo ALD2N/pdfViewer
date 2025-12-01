@@ -62,7 +62,11 @@
         console.log('🚀 Démarrage du chargement des composants...');
         
         await loadScript('SearchService.js');
+        await loadScript('components/TruncatedText.js');
         await loadScript('components/BookmarkList.js');
+        await loadScript('components/FolderTree.js');
+        await loadScript('components/OrphanPdfList.js');
+        await loadScript('components/RecentPdfList.js');
         await loadScript('components/HomeScreen.js');
         await loadScript('components/PdfViewer.js');
         await loadScript('components/SearchPanel.js');

@@ -35,18 +35,22 @@ class PersistenceService {
    * @returns {Promise<Object>}
    */
   async loadConfig() {
+    console.log('[DEBUG] PersistenceService.loadConfig: Starting to load config from', this.configPath);
+    console.log('[DEBUG] PersistenceService.loadConfig: Starting to load config from', this.configPath);
     try {
       const exists = await fs.pathExists(this.configPath);
       
       if (!exists) {
         // Créer une configuration par défaut
         this.config = { ...DEFAULT_CONFIG };
+        console.log('[DEBUG] PersistenceService.loadConfig: Config file does not exist, creating default config');
         await this.saveConfig();
         return this.config;
       }
 
       const data = await fs.readFile(this.configPath, 'utf8');
       this.config = JSON.parse(data);
+      console.log('[DEBUG] PersistenceService.loadConfig: Config loaded successfully, version:', this.config.version);
 
       // Valider et migrer si nécessaire
       this.config = this.validateAndMigrate(this.config);
@@ -62,6 +66,7 @@ class PersistenceService {
           const backupData = await fs.readFile(this.backupPath, 'utf8');
           this.config = JSON.parse(backupData);
           this.config = this.validateAndMigrate(this.config);
+          console.log('[DEBUG] PersistenceService.loadConfig: Restored from backup');
           await this.saveConfig();
           return this.config;
         }
@@ -72,6 +77,7 @@ class PersistenceService {
       // Reset à défaut si tout échoue
       console.warn('Reset à configuration par défaut');
       this.config = { ...DEFAULT_CONFIG };
+      console.log('[DEBUG] PersistenceService.loadConfig: Reset to default config');
       await this.saveConfig();
       return this.config;
     }
@@ -88,8 +94,16 @@ class PersistenceService {
       version: config.version || CONFIG.CONFIG_VERSION,
       recentPdfs: Array.isArray(config.recentPdfs) ? config.recentPdfs : [],
       bookmarks: typeof config.bookmarks === 'object' && config.bookmarks !== null 
-        ? config.bookmarks : {}
+        ? config.bookmarks : {},
+      folders: typeof config.folders === 'object' && config.folders !== null 
+        ? config.folders : {}
     };
+
+    // Migration de version 1.0 à 1.1 : ajouter folders vide
+    if (validated.version === '1.0') {
+      validated.version = '1.1';
+      validated.folders = {};
+    }
 
     // Limiter le nombre de PDFs récents
     if (validated.recentPdfs.length > CONFIG.MAX_RECENT_PDFS) {
@@ -125,6 +139,21 @@ class PersistenceService {
       });
     }
 
+    // Valider la structure des folders
+    for (const folderId of Object.keys(validated.folders)) {
+      const folder = validated.folders[folderId];
+      if (!folder || typeof folder !== 'object') {
+        delete validated.folders[folderId];
+        continue;
+      }
+
+      // Assurer la structure des folders
+      folder.name = typeof folder.name === 'string' ? folder.name.trim() : 'Dossier sans nom';
+      folder.parentId = folder.parentId === null || typeof folder.parentId === 'string' ? folder.parentId : null;
+      folder.childrenIds = Array.isArray(folder.childrenIds) ? folder.childrenIds.filter(id => typeof id === 'string') : [];
+      folder.pdfPaths = Array.isArray(folder.pdfPaths) ? folder.pdfPaths.filter(path => typeof path === 'string') : [];
+    }
+
     return validated;
   }
 
@@ -133,6 +162,7 @@ class PersistenceService {
    * RC1: Prévention de la perte de données
    */
   async saveConfig() {
+    console.log('[DEBUG] PersistenceService.saveConfig: Saving config');
     if (!this.config) return;
 
     try {
@@ -230,6 +260,7 @@ class PersistenceService {
    * @returns {Promise<Object>} - Bookmark créé
    */
   async addBookmark(pdfPath, bookmarkData) {
+    console.log('[DEBUG] PersistenceService.addBookmark: Adding bookmark for', pdfPath, 'page', bookmarkData.page);
     if (!this.config.bookmarks[pdfPath]) {
       this.config.bookmarks[pdfPath] = {
         hash: null,
@@ -390,6 +421,23 @@ class PersistenceService {
     }
 
     pdfData.bookmarks = reordered;
+    this.scheduleSave();
+  }
+
+  /**
+   * Charge les dossiers depuis la configuration
+   * @returns {Promise<Object>} - Objet folders
+   */
+  async loadFolders() {
+    return this.config.folders || {};
+  }
+
+  /**
+   * Sauvegarde les dossiers dans la configuration
+   * R18: Persistance automatique des dossiers
+   */
+  async saveFolders(folders) {
+    this.config.folders = { ...folders };
     this.scheduleSave();
   }
 }

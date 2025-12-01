@@ -15,6 +15,15 @@
 - **R9** : Le bouton toggle dans la sidebar alterne exclusivement entre les modes "Bookmarks" et "Recherche".
 - **R10** : La recherche est performante (< 3 secondes pour 100 pages, < 10 secondes pour 500 pages), limitée à 100 occurrences affichées (pas de groupement par page).
 - **R11** : Pas d'historique des recherches précédentes (chaque recherche est indépendante).
+- **R12** : Les dossiers sont virtuels et hiérarchiques, avec profondeur illimitée et noms uniques par parent.
+- **R13** : Relation M:N entre dossiers et PDFs : un PDF peut être assigné à plusieurs dossiers sans duplication physique.
+- **R14** : Suppression d'un dossier supprime récursivement les sous-dossiers et dissocie les PDFs assignés (sans supprimer les fichiers PDF).
+- **R15** : Renommage d'un dossier est immédiat, persistant, et validé pour non-vide et unique par parent.
+- **R16** : Déplacement d'un dossier change son parentId, préservant la hiérarchie et les assignations.
+- **R17** : Drag-drop d'un PDF vers un dossier l'assigne, avec feedback visuel et prévention des doublons.
+- **R18** : Persistance automatique des dossiers dans JSON à chaque modification.
+- **R19** : Ouverture d'un PDF depuis un dossier navigue vers la visualisation, vérifiant l'existence du fichier.
+- **R20** : Les PDFs orphelins sont ceux non présents dans `pdfPaths` d'aucun dossier, affichés dans la colonne centre.
 
 ## Invariants métier (INV-01 à INV-10)
 

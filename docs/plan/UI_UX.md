@@ -121,3 +121,56 @@
 - **Erreurs** : Toast/message en bas pour "Fichier introuvable", "Page invalide".
 - **Confirmations** : Toast vert pour "Bookmark ajouté".
 - **États** : Boutons disabled pendant opérations asynchrones.
+
+## Layout écran d'accueil v2 (3 colonnes)
+
+- **Colonne gauche (Arborescence)** : FolderTree avec nœuds expandables/collapsables, icônes dossier, boutons "+" pour créer sous-dossier, menu contextuel pour renommer/déplacer/supprimer.
+- **Colonne centre (Orphelins)** : OrphanPdfList listant les PDFs non assignés à aucun dossier, avec icône PDF, nom, drag handle.
+- **Colonne droite (Récents)** : RecentPdfList listant les PDFs récemment ouverts, même format que orphelins.
+- **Drag & drop zones** : Survol des nœuds dans FolderTree highlight en bleu (#007acc).
+- **Responsive** : Colonnes flexibles, min largeur 1000px, centrage.
+
+### Wireframe textuel
+```
++-------------------------------------+
+|        PDF Viewer                   |
++-------------------------------------+
+| Folder Tree    | Orphan PDFs   | Recent PDFs   |
+| + Root         | [pdf1.pdf]    | [recent1.pdf] |
+|   - Sub        | [pdf2.pdf]    | [recent2.pdf] |
+|     - SubSub   |               |               |
+|                |               |               |
+| [Créer Dossier]|               |               |
++-------------------------------------+
+```
+
+### Styles CSS pour drag-over et expansion/collapse
+```css
+.folder-node {
+  padding: 5px;
+  cursor: pointer;
+}
+
+.folder-node.drag-over {
+  background-color: #007acc;
+  color: #ffffff;
+}
+
+.expand-icon {
+  margin-right: 5px;
+}
+
+.expand-icon.expanded::before {
+  content: "▼";
+}
+
+.expand-icon.collapsed::before {
+  content: "▶";
+}
+```
+
+### Interactions drag-n-drop
+- **Initiation** : Drag depuis OrphanPdfList ou RecentPdfList (handle visible au hover).
+- **Feedback** : Pendant drag, élément semi-transparent, drop zones highlightées.
+- **Drop** : Sur nœud FolderTree, assigner PDF au dossier ; si drop sur vide, pas d'action.
+- **Annulation** : Relâcher hors zone, retour à position initiale.
