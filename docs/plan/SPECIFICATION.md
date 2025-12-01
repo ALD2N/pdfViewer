@@ -33,6 +33,11 @@ Le projet "PDF Viewer" est un visualiseur de PDF local intégré avec un systèm
 - **US10** : En tant qu'utilisateur, je veux voir les résultats de recherche avec contexte de 5 mots avant/après, afin de comprendre les occurrences.
 - **US11** : En tant qu'utilisateur, je veux cliquer sur un résultat pour naviguer vers la page et voir le surlignage, afin de localiser rapidement.
 - **US12** : En tant qu'utilisateur, je veux que la recherche soit insensible à la casse avec correspondances partielles, limitée à 100 résultats, sans historique.
+- **US13** : En tant qu'utilisateur, je veux créer des dossiers virtuels hiérarchiques pour organiser mes PDFs, afin de les grouper logiquement et naviguer dans une arborescence.
+- **US14** : En tant qu'utilisateur, je veux assigner un PDF à plusieurs dossiers via drag & drop depuis les listes orphelins ou récents, afin de faciliter l'organisation multi-catégorie.
+- **US15** : En tant qu'utilisateur, je veux naviguer dans l'arborescence des dossiers avec expansion/collapse des nœuds, afin de voir la structure hiérarchique complète.
+- **US16** : En tant qu'utilisateur, je veux renommer ou déplacer des dossiers via un menu contextuel, afin de maintenir une organisation à jour.
+- **US17** : En tant qu'utilisateur, je veux voir les PDFs orphelins (non assignés) et les PDFs récents dans des colonnes séparées, afin de gérer facilement les assignations.
 
 ## Fonctionnalité de Recherche
 
@@ -65,6 +70,87 @@ Ajout d'une fonctionnalité de recherche textuelle dans les PDFs ouverts. Permet
 
 Voir R7 à R11 dans `docs/plan/REGLES_METIER.md`.
 
+## Gestion des dossiers hiérarchiques
+
+### Description
+
+Ajout d'une fonctionnalité de gestion de dossiers virtuels hiérarchiques pour organiser les PDFs. Les dossiers sont virtuels (pas de répertoires physiques), avec une relation M:N (un PDF peut être dans plusieurs dossiers). L'écran d'accueil est refactorisé en 3 colonnes : arborescence gauche, orphelins centre, récents droite. Drag & drop pour assigner PDFs aux dossiers. Persistance dans JSON étendu.
+
+### Flux fonctionnels
+
+#### Chargement des dossiers
+1. Au démarrage de l'app, charger la structure `folders` depuis `config.json`.
+2. Construire l'arborescence récursive à partir de `parentId` et `childrenIds`.
+3. Afficher dans FolderTree avec expansion/collapse.
+
+#### Création d'un dossier
+1. Clic droit dans FolderTree ou bouton "+" sur un nœud.
+2. Saisie du nom via prompt ou input inline.
+3. IPC vers main pour créer (générer ID unique).
+4. Ajouter à `folders`, mettre à jour `parentId` et `childrenIds`.
+5. Sauvegarder JSON, notifier renderer pour refresh UI.
+
+#### Drag-drop d'un PDF vers un dossier
+1. Drag depuis OrphanPdfList ou RecentPdfList.
+2. Survol d'un nœud dans FolderTree : highlight drop zone.
+3. Drop : IPC `FOLDER_ASSIGN_PDF` avec folderId et pdfPath.
+4. Main ajoute pdfPath à `pdfPaths` du dossier (si pas déjà présent).
+5. Sauvegarder, notifier renderer pour déplacer PDF de orphelins à assignés.
+
+#### Ouverture d'un PDF depuis un dossier
+1. Clic sur un PDF dans FolderTree (si assigné).
+2. Vérifier existence fichier.
+3. Naviguer vers PdfViewer avec le PDF ouvert.
+
+### Structure JSON pour folders (version 1.1)
+
+Le fichier `~/.config/pdf-viewer/config.json` est étendu :
+
+```json
+{
+  "version": "1.1",
+  "recentPdfs": [
+    "/path/to/file1.pdf",
+    "/path/to/file2.pdf"
+  ],
+  "bookmarks": {
+    "/path/to/file.pdf": {
+      "hash": "md5_hash_of_pdf",
+      "lastOpened": "2023-10-01T12:00:00Z",
+      "bookmarks": [
+        {
+          "id": "unique_id",
+          "page": 5,
+          "title": "Chapitre 1",
+          "thumbnailPath": "~/.config/pdf-viewer/thumbnails/file_hash_page5.jpg",
+          "createdAt": "2023-10-01T12:05:00Z"
+        }
+      ]
+    }
+  },
+  "folders": {
+    "folderId1": {
+      "name": "Dossier Racine",
+      "parentId": null,
+      "childrenIds": ["folderId2"],
+      "pdfPaths": ["/path/to/file1.pdf"]
+    },
+    "folderId2": {
+      "name": "Sous-Dossier",
+      "parentId": "folderId1",
+      "childrenIds": [],
+      "pdfPaths": ["/path/to/file1.pdf", "/path/to/file2.pdf"]
+    }
+  }
+}
+```
+
+- `folders` : Objet avec clés IDs de dossiers.
+- `name` : Nom du dossier (unique par parent).
+- `parentId` : ID du parent (null pour racine).
+- `childrenIds` : Liste IDs enfants.
+- `pdfPaths` : Liste chemins PDFs assignés (relation M:N).
+
 ## Architecture technique (Electron + React + PDF.js)
 
 - **Framework principal** : Electron pour l'application desktop multiplateforme.
@@ -86,7 +172,7 @@ Le fichier `~/.config/pdf-viewer/config.json` suit cette structure :
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1",
   "recentPdfs": [
     "/path/to/file1.pdf",
     "/path/to/file2.pdf"
@@ -104,6 +190,20 @@ Le fichier `~/.config/pdf-viewer/config.json` suit cette structure :
           "createdAt": "2023-10-01T12:05:00Z"
         }
       ]
+    }
+  },
+  "folders": {
+    "folderId1": {
+      "name": "Dossier Racine",
+      "parentId": null,
+      "childrenIds": ["folderId2"],
+      "pdfPaths": ["/path/to/file1.pdf"]
+    },
+    "folderId2": {
+      "name": "Sous-Dossier",
+      "parentId": "folderId1",
+      "childrenIds": [],
+      "pdfPaths": ["/path/to/file1.pdf", "/path/to/file2.pdf"]
     }
   }
 }
