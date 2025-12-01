@@ -7,7 +7,7 @@
 (function() {
   const { useState, useCallback, useMemo } = React;
 
-  function FolderTree({ folders, onCreateFolder, onUpdateFolder, onDeleteFolder, onAssignPdf, onUnassignPdf, expandedFolders, onToggleExpand, onOpenPdf }) {
+  function FolderTree({ folders, onCreateFolder, onUpdateFolder, onDeleteFolder, onAssignPdf, onUnassignPdf, onRemovePdf, expandedFolders, onToggleExpand, onOpenPdf }) {
     // État local pour le menu contextuel des dossiers et drag-over
     const [contextMenu, setContextMenu] = useState(null);
     // État pour le menu contextuel des PDFs
@@ -294,9 +294,18 @@
             onClick: handleAddPdfToAnotherFolder
           }, 'Ajouter à un autre dossier'),
           React.createElement('div', {
-            className: 'context-menu-item delete',
+            className: 'context-menu-item',
             onClick: handleRemovePdfFromFolder
-          }, 'Retirer du dossier')
+          }, 'Retirer du dossier'),
+          React.createElement('div', {
+            className: 'context-menu-item delete',
+            onClick: () => {
+              if (pdfContextMenu && onRemovePdf) {
+                onRemovePdf(pdfContextMenu.pdfPath);
+              }
+              closePdfContextMenu();
+            }
+          }, 'Supprimer')
         )
       ),
 

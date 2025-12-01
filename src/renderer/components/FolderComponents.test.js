@@ -412,6 +412,7 @@ describe('Folder Components', () => {
         onDeleteFolder: jest.fn(),
         onAssignPdf: jest.fn(),
         onUnassignPdf: jest.fn(),
+        onRemovePdf: jest.fn(),
         onToggleExpand: jest.fn()
       };
 
@@ -442,6 +443,7 @@ describe('Folder Components', () => {
         onDeleteFolder: jest.fn(),
         onAssignPdf: jest.fn(),
         onUnassignPdf: jest.fn(),
+        onRemovePdf: jest.fn(),
         expandedFolders: new Set(['folder1']),
         onToggleExpand: jest.fn(),
         onOpenPdf: jest.fn()
@@ -456,6 +458,7 @@ describe('Folder Components', () => {
       // Verify context menu options are displayed
       expect(screen.getByText('Ajouter à un autre dossier')).toBeInTheDocument();
       expect(screen.getByText('Retirer du dossier')).toBeInTheDocument();
+      expect(screen.getByText('Supprimer')).toBeInTheDocument();
     });
 
     test('Click "Retirer du dossier" calls onUnassignPdf', () => {
@@ -476,6 +479,7 @@ describe('Folder Components', () => {
         onDeleteFolder: jest.fn(),
         onAssignPdf: jest.fn(),
         onUnassignPdf,
+        onRemovePdf: jest.fn(),
         expandedFolders: new Set(['folder1']),
         onToggleExpand: jest.fn(),
         onOpenPdf: jest.fn()
@@ -516,6 +520,7 @@ describe('Folder Components', () => {
         onDeleteFolder: jest.fn(),
         onAssignPdf: jest.fn(),
         onUnassignPdf: jest.fn(),
+        onRemovePdf: jest.fn(),
         expandedFolders: new Set(['folder1']),
         onToggleExpand: jest.fn(),
         onOpenPdf: jest.fn()
@@ -568,6 +573,7 @@ describe('Folder Components', () => {
         onDeleteFolder: jest.fn(),
         onAssignPdf: jest.fn(),
         onUnassignPdf: jest.fn(),
+        onRemovePdf: jest.fn(),
         expandedFolders: new Set(['folder1']),
         onToggleExpand: jest.fn(),
         onOpenPdf: jest.fn()
@@ -615,6 +621,7 @@ describe('Folder Components', () => {
         onDeleteFolder: jest.fn(),
         onAssignPdf,
         onUnassignPdf: jest.fn(),
+        onRemovePdf: jest.fn(),
         expandedFolders: new Set(['folder1']),
         onToggleExpand: jest.fn(),
         onOpenPdf: jest.fn()

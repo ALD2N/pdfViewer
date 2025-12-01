@@ -7,6 +7,7 @@
 
   function RecentPdfList({ recentPdfs, onOpenPdf, onRemovePdf }) {
     const [confirmRemove, setConfirmRemove] = useState(null);
+    const [contextMenu, setContextMenu] = useState(null);
 
     // Gérer le drag start
     const handleDragStart = useCallback((e, pdfPath) => {
@@ -34,11 +35,16 @@
       return `${start}...${end}`;
     };
 
-    // Demander confirmation de retrait
-    const askRemoveConfirmation = useCallback((e, pdfPath) => {
-      e.stopPropagation();
-      setConfirmRemove(pdfPath);
+    // Fermer le menu contextuel
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
     }, []);
+
+    // Demander confirmation de retrait
+    const askRemoveConfirmation = useCallback((pdfPath) => {
+      setConfirmRemove(pdfPath);
+      closeContextMenu();
+    }, [closeContextMenu]);
 
     // Confirmer le retrait
     const confirmRemoveAction = useCallback(() => {
@@ -53,6 +59,12 @@
       setConfirmRemove(null);
     }, []);
 
+    // Gérer le menu contextuel
+    const handleContextMenu = useCallback((e, pdfPath) => {
+      e.preventDefault();
+      setContextMenu({ x: e.clientX, y: e.clientY, pdfPath });
+    }, []);
+
     return React.createElement('div', { className: 'recent-pdf-list' },
       React.createElement('h3', null, 'PDFs récents'),
       recentPdfs.length > 0
@@ -60,13 +72,14 @@
             recentPdfs.map(item => {
               const pdfPath = typeof item === 'object' && item.path ? item.path : item;
               const exists = typeof item === 'object' ? item.exists : true;
-              return React.createElement('div', {
-                key: pdfPath,
-                className: `pdf-item draggable ${!exists ? 'missing' : ''}`,
-                draggable: true,
-                onDragStart: (e) => handleDragStart(e, pdfPath),
-                onClick: () => exists && onOpenPdf(pdfPath)
-              },
+               return React.createElement('div', {
+                 key: pdfPath,
+                 className: `pdf-item draggable ${!exists ? 'missing' : ''}`,
+                 draggable: true,
+                 onDragStart: (e) => handleDragStart(e, pdfPath),
+                 onClick: () => exists && onOpenPdf(pdfPath),
+                 onContextMenu: (e) => handleContextMenu(e, pdfPath)
+               },
                 React.createElement('div', { className: 'pdf-icon' }, exists ? '📄' : '❌'),
                 React.createElement('div', { className: 'pdf-info' },
                   React.createElement(window.TruncatedText, {
@@ -75,15 +88,8 @@
                   }),
                   React.createElement('div', { className: 'pdf-path' }, truncatePath(pdfPath)),
                   !exists && React.createElement('div', { className: 'missing-note' }, 'Fichier introuvable')
-                ),
-                exists && React.createElement('div', { className: 'pdf-actions' },
-                  React.createElement('button', {
-                    className: 'btn-danger-small',
-                    onClick: (e) => askRemoveConfirmation(e, pdfPath),
-                    title: 'Retirer de la liste'
-                  }, '🗑️')
-                ),
-                React.createElement('div', { className: 'drag-handle' }, '⋮⋮')
+                 ),
+                 React.createElement('div', { className: 'drag-handle' }, '⋮⋮')
               );
             })
           )
@@ -113,6 +119,22 @@
               onClick: confirmRemoveAction
             }, 'Retirer')
           )
+        )
+      ),
+
+      // Menu contextuel
+      contextMenu && React.createElement('div', {
+        className: 'context-menu-overlay',
+        onClick: closeContextMenu
+      },
+        React.createElement('div', {
+          className: 'context-menu',
+          style: { left: contextMenu.x, top: contextMenu.y }
+        },
+          React.createElement('div', {
+            className: 'context-menu-item delete',
+            onClick: () => askRemoveConfirmation(contextMenu.pdfPath)
+          }, 'Supprimer')
         )
       )
     );

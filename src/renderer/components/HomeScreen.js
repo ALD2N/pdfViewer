@@ -52,19 +52,21 @@
             onDeleteFolder: onDeleteFolder,
             onAssignPdf: onAssignPdf,
             onUnassignPdf: onUnassignPdf,
+            onRemovePdf: onRemovePdf,
             expandedFolders: expandedFolders,
             onToggleExpand: onToggleExpand,
             onOpenPdf: onOpenPdf
           })
         ),
 
-        // Colonne 2: PDFs orphelins
-        React.createElement('div', { className: 'column orphan-pdfs-column' },
-          React.createElement(window.OrphanPdfList, {
-            orphanPdfs: orphanPdfs,
-            onOpenPdf: onOpenPdf
-          })
-        ),
+         // Colonne 2: PDFs orphelins
+         React.createElement('div', { className: 'column orphan-pdfs-column' },
+           React.createElement(window.OrphanPdfList, {
+             orphanPdfs: orphanPdfs,
+             onOpenPdf: onOpenPdf,
+             onRemovePdf: onRemovePdf
+           })
+         ),
 
         // Colonne 3: PDFs récents
         React.createElement('div', { className: 'column recent-pdfs-column' },

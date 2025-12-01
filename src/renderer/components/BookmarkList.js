@@ -16,6 +16,7 @@
     const [editTitle, setEditTitle] = useState('');
     const [draggedIndex, setDraggedIndex] = useState(null);
     const [displayMode, setDisplayMode] = useState(DISPLAY_MODES.THUMBNAILS);
+    const [contextMenu, setContextMenu] = useState(null);
     const clickTimeoutRef = useRef(null);
 
     useEffect(() => {
@@ -134,6 +135,23 @@
       startEditing(bookmark);
     }, [startEditing]);
 
+    // Gérer le clic droit pour le menu contextuel
+    const handleContextMenu = useCallback((e, bookmark) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        bookmark
+      });
+    }, []);
+
+    // Fermer le menu contextuel
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
+    }, []);
+
     const sectionClassName = `bookmarks-section ${displayMode === DISPLAY_MODES.COMPACT ? 'compact-mode' : 'thumbnails-mode'}`;
     const listClassName = `bookmarks-list ${displayMode}`;
 
@@ -159,16 +177,17 @@
       bookmarks.length > 0
         ? React.createElement('div', { className: listClassName },
             bookmarks.map((bookmark, index) =>
-              React.createElement('div', {
-                key: bookmark.id,
-                className: `bookmark-item ${draggedIndex === index ? 'dragging' : ''} ${displayMode === DISPLAY_MODES.COMPACT ? 'compact' : ''}`,
-                draggable: true,
-                onDragStart: (e) => handleDragStart(e, index),
-                onDragOver: handleDragOver,
-                onDrop: (e) => handleDrop(e, index),
-                onDragEnd: handleDragEnd,
-                onClick: () => handleItemClick(bookmark)
-              },
+               React.createElement('div', {
+                 key: bookmark.id,
+                 className: `bookmark-item ${draggedIndex === index ? 'dragging' : ''} ${displayMode === DISPLAY_MODES.COMPACT ? 'compact' : ''}`,
+                 draggable: true,
+                 onDragStart: (e) => handleDragStart(e, index),
+                 onDragOver: handleDragOver,
+                 onDrop: (e) => handleDrop(e, index),
+                 onDragEnd: handleDragEnd,
+                 onClick: () => handleItemClick(bookmark),
+                 onContextMenu: (e) => handleContextMenu(e, bookmark)
+               },
                 displayMode === DISPLAY_MODES.THUMBNAILS &&
                   React.createElement('div', { className: 'bookmark-thumbnail' },
                     bookmark.thumbnailPath
@@ -236,22 +255,33 @@
                       onNavigate(bookmark);
                     },
                     title: 'Aller à la page'
-                  }, '➡️'),
-                  React.createElement('button', {
-                    className: 'btn-danger btn-small',
-                    onClick: (e) => {
-                      e.stopPropagation();
-                      onDelete(bookmark.id);
-                    },
-                    title: 'Supprimer'
-                  }, '🗑️')
+                  }, '➡️')
                 )
               )
             )
           )
         : React.createElement('div', { className: 'bookmarks-empty' },
             'Aucun bookmark. Cliquez sur "🔖 Bookmark" pour en ajouter.'
-          )
+          ),
+
+      // Menu contextuel
+      contextMenu && React.createElement('div', {
+        className: 'context-menu-overlay',
+        onClick: closeContextMenu
+      },
+        React.createElement('div', {
+          className: 'context-menu',
+          style: { left: contextMenu.x, top: contextMenu.y }
+        },
+          React.createElement('div', {
+            className: 'context-menu-item delete',
+            onClick: () => {
+              onDelete(contextMenu.bookmark.id);
+              closeContextMenu();
+            }
+          }, 'Supprimer')
+        )
+      )
     );
   }
 

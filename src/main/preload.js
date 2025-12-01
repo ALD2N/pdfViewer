@@ -30,6 +30,7 @@ const ALLOWED_CHANNELS = [
   'folder:move',
   'folder:rename',
   'shell:open-external',
+  'context-menu:show-delete',
   'config:get',
   'config:save',
   'error',
@@ -316,6 +317,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return Promise.reject(new Error('URL malformée'));
     }
     return ipcRenderer.invoke('shell:open-external', url);
+  },
+
+  // ============================================
+  // MENU CONTEXTUEL
+  // ============================================
+
+  /**
+   * Affiche un menu contextuel pour supprimer un élément
+   * @param {string} type - Type d'élément ('pdf' ou 'bookmark')
+   * @param {string} id - Identifiant de l'élément (path pour pdf, id pour bookmark)
+   * @returns {Promise<Object>}
+   */
+  showDeleteContextMenu: (type, id) => {
+    if (typeof type !== 'string' || typeof id !== 'string') {
+      return Promise.reject(new Error('Paramètres invalides'));
+    }
+    return ipcRenderer.invoke('context-menu:show-delete', { type, id });
   },
 
   // ============================================
