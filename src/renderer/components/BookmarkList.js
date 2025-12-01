@@ -16,6 +16,7 @@
     const [editTitle, setEditTitle] = useState('');
     const [draggedIndex, setDraggedIndex] = useState(null);
     const [displayMode, setDisplayMode] = useState(DISPLAY_MODES.THUMBNAILS);
+    const [contextMenu, setContextMenu] = useState(null);
     const clickTimeoutRef = useRef(null);
 
     useEffect(() => {
@@ -139,14 +140,17 @@
       e.preventDefault();
       e.stopPropagation();
 
-      window.electronAPI.showDeleteContextMenu('bookmark', bookmark.id).then((result) => {
-        if (result.action === 'delete') {
-          onDelete(bookmark.id);
-        }
-      }).catch((error) => {
-        console.error('Erreur menu contextuel:', error);
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        bookmark
       });
-    }, [onDelete]);
+    }, []);
+
+    // Fermer le menu contextuel
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
+    }, []);
 
     const sectionClassName = `bookmarks-section ${displayMode === DISPLAY_MODES.COMPACT ? 'compact-mode' : 'thumbnails-mode'}`;
     const listClassName = `bookmarks-list ${displayMode}`;
@@ -258,7 +262,26 @@
           )
         : React.createElement('div', { className: 'bookmarks-empty' },
             'Aucun bookmark. Cliquez sur "🔖 Bookmark" pour en ajouter.'
-          )
+          ),
+
+      // Menu contextuel
+      contextMenu && React.createElement('div', {
+        className: 'context-menu-overlay',
+        onClick: closeContextMenu
+      },
+        React.createElement('div', {
+          className: 'context-menu',
+          style: { left: contextMenu.x, top: contextMenu.y }
+        },
+          React.createElement('div', {
+            className: 'context-menu-item delete',
+            onClick: () => {
+              onDelete(contextMenu.bookmark.id);
+              closeContextMenu();
+            }
+          }, 'Supprimer')
+        )
+      )
     );
   }
 

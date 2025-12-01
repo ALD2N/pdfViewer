@@ -52,6 +52,7 @@
             onDeleteFolder: onDeleteFolder,
             onAssignPdf: onAssignPdf,
             onUnassignPdf: onUnassignPdf,
+            onRemovePdf: onRemovePdf,
             expandedFolders: expandedFolders,
             onToggleExpand: onToggleExpand,
             onOpenPdf: onOpenPdf

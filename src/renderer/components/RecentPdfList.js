@@ -7,6 +7,7 @@
 
   function RecentPdfList({ recentPdfs, onOpenPdf, onRemovePdf }) {
     const [confirmRemove, setConfirmRemove] = useState(null);
+    const [contextMenu, setContextMenu] = useState(null);
 
     // Gérer le drag start
     const handleDragStart = useCallback((e, pdfPath) => {
@@ -37,7 +38,8 @@
     // Demander confirmation de retrait
     const askRemoveConfirmation = useCallback((pdfPath) => {
       setConfirmRemove(pdfPath);
-    }, []);
+      closeContextMenu();
+    }, [closeContextMenu]);
 
     // Confirmer le retrait
     const confirmRemoveAction = useCallback(() => {
@@ -57,14 +59,17 @@
       e.preventDefault();
       e.stopPropagation();
 
-      window.electronAPI.showDeleteContextMenu('pdf', pdfPath).then((result) => {
-        if (result.action === 'delete') {
-          askRemoveConfirmation(pdfPath);
-        }
-      }).catch((error) => {
-        console.error('Erreur menu contextuel:', error);
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        pdfPath
       });
-    }, [askRemoveConfirmation]);
+    }, []);
+
+    // Fermer le menu contextuel
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
+    }, []);
 
     return React.createElement('div', { className: 'recent-pdf-list' },
       React.createElement('h3', null, 'PDFs récents'),
@@ -120,6 +125,22 @@
               onClick: confirmRemoveAction
             }, 'Retirer')
           )
+        )
+      ),
+
+      // Menu contextuel
+      contextMenu && React.createElement('div', {
+        className: 'context-menu-overlay',
+        onClick: closeContextMenu
+      },
+        React.createElement('div', {
+          className: 'context-menu',
+          style: { left: contextMenu.x, top: contextMenu.y }
+        },
+          React.createElement('div', {
+            className: 'context-menu-item delete',
+            onClick: () => askRemoveConfirmation(contextMenu.pdfPath)
+          }, 'Supprimer')
         )
       )
     );

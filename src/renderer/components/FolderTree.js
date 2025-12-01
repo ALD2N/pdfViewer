@@ -7,7 +7,7 @@
 (function() {
   const { useState, useCallback, useMemo } = React;
 
-  function FolderTree({ folders, onCreateFolder, onUpdateFolder, onDeleteFolder, onAssignPdf, onUnassignPdf, expandedFolders, onToggleExpand, onOpenPdf }) {
+  function FolderTree({ folders, onCreateFolder, onUpdateFolder, onDeleteFolder, onAssignPdf, onUnassignPdf, onRemovePdf, expandedFolders, onToggleExpand, onOpenPdf }) {
     // État local pour le menu contextuel des dossiers et drag-over
     const [contextMenu, setContextMenu] = useState(null);
     // État pour le menu contextuel des PDFs
@@ -126,13 +126,13 @@
       closePdfContextMenu();
     }, [pdfContextMenu, folders, closePdfContextMenu]);
 
-    // Sélectionner un dossier dans la modale
-    const handleSelectFolderForPdf = useCallback((folderId) => {
-      if (folderSelectModal && onAssignPdf) {
-        onAssignPdf(folderId, folderSelectModal.pdfPath);
+    // Supprimer un PDF de l'application
+    const handleRemovePdfFromApp = useCallback(() => {
+      if (pdfContextMenu && onRemovePdf) {
+        onRemovePdf(pdfContextMenu.pdfPath);
       }
-      setFolderSelectModal(null);
-    }, [folderSelectModal, onAssignPdf]);
+      closePdfContextMenu();
+    }, [pdfContextMenu, onRemovePdf, closePdfContextMenu]);
 
     // Liste des dossiers disponibles pour la modale de sélection (excluant ceux où le PDF est déjà)
     const availableFoldersForSelect = useMemo(() => {
@@ -294,9 +294,13 @@
             onClick: handleAddPdfToAnotherFolder
           }, 'Ajouter à un autre dossier'),
           React.createElement('div', {
-            className: 'context-menu-item delete',
+            className: 'context-menu-item',
             onClick: handleRemovePdfFromFolder
-          }, 'Retirer du dossier')
+          }, 'Retirer du dossier'),
+          React.createElement('div', {
+            className: 'context-menu-item delete',
+            onClick: handleRemovePdfFromApp
+          }, 'Supprimer')
         )
       ),
 

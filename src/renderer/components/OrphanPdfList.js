@@ -3,9 +3,10 @@
  */
 
 (function() {
-  const { useCallback } = React;
+  const { useState, useCallback } = React;
 
   function OrphanPdfList({ orphanPdfs, onOpenPdf, onRemovePdf }) {
+    const [contextMenu, setContextMenu] = useState(null);
     // Gérer le drag start
     const handleDragStart = useCallback((e, pdfPath) => {
       e.dataTransfer.setData('text/plain', pdfPath);
@@ -17,14 +18,17 @@
       e.preventDefault();
       e.stopPropagation();
 
-      window.electronAPI.showDeleteContextMenu('pdf', pdfPath).then((result) => {
-        if (result.action === 'delete') {
-          onRemovePdf(pdfPath);
-        }
-      }).catch((error) => {
-        console.error('Erreur menu contextuel:', error);
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        pdfPath
       });
-    }, [onRemovePdf]);
+    }, []);
+
+    // Fermer le menu contextuel
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
+    }, []);
 
     // Extraire le nom du fichier
     const getFileName = (pdf) => {
@@ -84,7 +88,26 @@
             React.createElement('div', { className: 'empty-state-icon' }, '📄'),
             React.createElement('p', null, 'Aucun PDF orphelin'),
             React.createElement('p', null, 'Tous les PDFs sont organisés dans des dossiers')
-          )
+          ),
+
+      // Menu contextuel
+      contextMenu && React.createElement('div', {
+        className: 'context-menu-overlay',
+        onClick: closeContextMenu
+      },
+        React.createElement('div', {
+          className: 'context-menu',
+          style: { left: contextMenu.x, top: contextMenu.y }
+        },
+          React.createElement('div', {
+            className: 'context-menu-item delete',
+            onClick: () => {
+              onRemovePdf(contextMenu.pdfPath);
+              closeContextMenu();
+            }
+          }, 'Supprimer')
+        )
+      )
     );
   }
 
