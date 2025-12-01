@@ -51,7 +51,8 @@
             onDeleteFolder: onDeleteFolder,
             onAssignPdf: onAssignPdf,
             expandedFolders: expandedFolders,
-            onToggleExpand: onToggleExpand
+            onToggleExpand: onToggleExpand,
+            onOpenPdf: onOpenPdf
           })
         ),
 

@@ -21,6 +21,14 @@ const ALLOWED_CHANNELS = [
   'bookmark:get-all',
   'thumbnail:generate',
   'thumbnail:get',
+  'folder:load',
+  'folder:create',
+  'folder:update',
+  'folder:delete',
+  'folder:assign-pdf',
+  'folder:unassign-pdf',
+  'folder:move',
+  'folder:rename',
   'shell:open-external',
   'config:get',
   'config:save',
@@ -206,21 +214,91 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('thumbnail:generate', { pdfPath, pageNum, imageData });
   },
 
-  /**
-   * Récupère une miniature existante
-   * @param {string} thumbnailPath - Chemin de la miniature
-   * @returns {Promise<Object>}
-   */
-  getThumbnail: (thumbnailPath) => {
-    if (typeof thumbnailPath !== 'string') {
-      return Promise.reject(new Error('Chemin invalide'));
-    }
-    return ipcRenderer.invoke('thumbnail:get', thumbnailPath);
-  },
+   /**
+    * Récupère une miniature existante
+    * @param {string} thumbnailPath - Chemin de la miniature
+    * @returns {Promise<Object>}
+    */
+   getThumbnail: (thumbnailPath) => {
+     if (typeof thumbnailPath !== 'string') {
+       return Promise.reject(new Error('Chemin invalide'));
+     }
+     return ipcRenderer.invoke('thumbnail:get', thumbnailPath);
+   },
 
-  // ============================================
-  // SHELL - LIENS EXTERNES
-  // ============================================
+   // ============================================
+   // GESTION DES DOSSIERS
+   // ============================================
+
+   /**
+    * Charge les dossiers
+    * @returns {Promise<Object>}
+    */
+   loadFolders: () => ipcRenderer.invoke('folder:load'),
+
+   /**
+    * Crée un dossier
+    * @param {Object} params - { name, parentId }
+    * @returns {Promise<Object>}
+    */
+   createFolder: (params) => {
+     if (typeof params?.name !== 'string' || !params.name.trim()) {
+       return Promise.reject(new Error('Nom de dossier invalide'));
+     }
+     return ipcRenderer.invoke('folder:create', params);
+   },
+
+   /**
+    * Met à jour un dossier
+    * @param {Object} params - { id, updates }
+    * @returns {Promise<Object>}
+    */
+   updateFolder: (params) => {
+     if (typeof params?.id !== 'string') {
+       return Promise.reject(new Error('ID de dossier invalide'));
+     }
+     return ipcRenderer.invoke('folder:update', params);
+   },
+
+   /**
+    * Supprime un dossier
+    * @param {Object} params - { id }
+    * @returns {Promise<Object>}
+    */
+   deleteFolder: (params) => {
+     if (typeof params?.id !== 'string') {
+       return Promise.reject(new Error('ID de dossier invalide'));
+     }
+     return ipcRenderer.invoke('folder:delete', params);
+   },
+
+   /**
+    * Assigne un PDF à un dossier
+    * @param {Object} params - { folderId, pdfPath }
+    * @returns {Promise<Object>}
+    */
+   assignPdfToFolder: (params) => {
+     if (typeof params?.folderId !== 'string' || typeof params?.pdfPath !== 'string') {
+       return Promise.reject(new Error('Paramètres invalides'));
+     }
+     return ipcRenderer.invoke('folder:assign-pdf', params);
+   },
+
+   /**
+    * Désassigne un PDF d'un dossier
+    * @param {Object} params - { folderId, pdfPath }
+    * @returns {Promise<Object>}
+    */
+   unassignPdfFromFolder: (params) => {
+     if (typeof params?.folderId !== 'string' || typeof params?.pdfPath !== 'string') {
+       return Promise.reject(new Error('Paramètres invalides'));
+     }
+     return ipcRenderer.invoke('folder:unassign-pdf', params);
+   },
+
+   // ============================================
+   // SHELL - LIENS EXTERNES
+   // ============================================
 
   /**
    * Ouvre une URL dans le navigateur par défaut

@@ -1595,6 +1595,14 @@ input:focus {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.folder-header.drag-over {
+  background-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .expand-icon {
@@ -1641,6 +1649,18 @@ input:focus {
   margin-top: 4px;
 }
 
+.empty-tree {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 20px;
+  text-align: center;
+}
+
+.create-root-btn {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
 .folder-pdfs {
   margin-left: 32px;
   margin-top: 8px;
@@ -1657,6 +1677,15 @@ input:focus {
   border-radius: 4px;
   background-color: var(--bg-tertiary);
   font-size: 13px;
+  transition: background-color 0.2s ease;
+}
+
+.folder-pdf-item.clickable {
+  cursor: pointer;
+}
+
+.folder-pdf-item.clickable:hover {
+  background-color: var(--accent-hover);
 }
 
 .pdf-icon-small {
