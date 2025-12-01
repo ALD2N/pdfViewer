@@ -35,18 +35,22 @@ class PersistenceService {
    * @returns {Promise<Object>}
    */
   async loadConfig() {
+    console.log('[DEBUG] PersistenceService.loadConfig: Starting to load config from', this.configPath);
+    console.log('[DEBUG] PersistenceService.loadConfig: Starting to load config from', this.configPath);
     try {
       const exists = await fs.pathExists(this.configPath);
       
       if (!exists) {
         // Créer une configuration par défaut
         this.config = { ...DEFAULT_CONFIG };
+        console.log('[DEBUG] PersistenceService.loadConfig: Config file does not exist, creating default config');
         await this.saveConfig();
         return this.config;
       }
 
       const data = await fs.readFile(this.configPath, 'utf8');
       this.config = JSON.parse(data);
+      console.log('[DEBUG] PersistenceService.loadConfig: Config loaded successfully, version:', this.config.version);
 
       // Valider et migrer si nécessaire
       this.config = this.validateAndMigrate(this.config);
@@ -62,6 +66,7 @@ class PersistenceService {
           const backupData = await fs.readFile(this.backupPath, 'utf8');
           this.config = JSON.parse(backupData);
           this.config = this.validateAndMigrate(this.config);
+          console.log('[DEBUG] PersistenceService.loadConfig: Restored from backup');
           await this.saveConfig();
           return this.config;
         }
@@ -72,6 +77,7 @@ class PersistenceService {
       // Reset à défaut si tout échoue
       console.warn('Reset à configuration par défaut');
       this.config = { ...DEFAULT_CONFIG };
+      console.log('[DEBUG] PersistenceService.loadConfig: Reset to default config');
       await this.saveConfig();
       return this.config;
     }
@@ -151,6 +157,7 @@ class PersistenceService {
     return validated;
   }
 
+    console.log('[DEBUG] PersistenceService.saveConfig: Saving config');
   /**
    * Sauvegarde la configuration de manière atomique
    * RC1: Prévention de la perte de données
@@ -247,6 +254,7 @@ class PersistenceService {
    * Ajoute un bookmark
    * R5: Plusieurs bookmarks peuvent exister sur la même page
    * R6: Ordre chronologique par défaut
+    console.log('[DEBUG] PersistenceService.addBookmark: Adding bookmark for', pdfPath, 'page', bookmarkData.page);
    * INV-02: Titre non-vide (défaut "Page X")
    * @param {string} pdfPath - Chemin du PDF
    * @param {Object} bookmarkData - Données du bookmark
