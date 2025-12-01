@@ -35,6 +35,11 @@
       return `${start}...${end}`;
     };
 
+    // Fermer le menu contextuel
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
+    }, []);
+
     // Demander confirmation de retrait
     const askRemoveConfirmation = useCallback((pdfPath) => {
       setConfirmRemove(pdfPath);
@@ -54,21 +59,10 @@
       setConfirmRemove(null);
     }, []);
 
-    // Gérer le clic droit pour le menu contextuel
+    // Gérer le menu contextuel
     const handleContextMenu = useCallback((e, pdfPath) => {
       e.preventDefault();
-      e.stopPropagation();
-
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-        pdfPath
-      });
-    }, []);
-
-    // Fermer le menu contextuel
-    const closeContextMenu = useCallback(() => {
-      setContextMenu(null);
+      setContextMenu({ x: e.clientX, y: e.clientY, pdfPath });
     }, []);
 
     return React.createElement('div', { className: 'recent-pdf-list' },
