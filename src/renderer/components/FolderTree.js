@@ -10,6 +10,9 @@
     // État local pour le menu contextuel et drag-over
     const [contextMenu, setContextMenu] = useState(null);
     const [dragOverId, setDragOverId] = useState(null);
+    // État pour la modale
+    const [modal, setModal] = useState(null);
+    const [modalValue, setModalValue] = useState('');
 
     // Gérer le clic droit sur un nœud
     const handleContextMenu = useCallback((e, folderId) => {
@@ -28,28 +31,46 @@
 
     // Créer un sous-dossier
     const handleCreateSubfolder = useCallback(() => {
-      const name = prompt('Nom du nouveau dossier:');
-      if (name && name.trim()) {
-        onCreateFolder(name.trim(), contextMenu.folderId);
-      }
+      setModalValue('');
+      setModal({
+        type: 'prompt',
+        title: 'Nom du nouveau dossier:',
+        defaultValue: '',
+        onConfirm: (name) => {
+          if (name && name.trim()) {
+            onCreateFolder(name.trim(), contextMenu.folderId);
+          }
+        }
+      });
       closeContextMenu();
     }, [contextMenu, onCreateFolder, closeContextMenu]);
 
     // Renommer un dossier
     const handleRename = useCallback(() => {
       const folder = folders[contextMenu.folderId];
-      const newName = prompt('Nouveau nom:', folder.name);
-      if (newName && newName.trim() && newName.trim() !== folder.name) {
-        onUpdateFolder(contextMenu.folderId, { name: newName.trim() });
-      }
+      setModalValue(folder.name);
+      setModal({
+        type: 'prompt',
+        title: 'Nouveau nom:',
+        defaultValue: folder.name,
+        onConfirm: (newName) => {
+          if (newName && newName.trim() && newName.trim() !== folder.name) {
+            onUpdateFolder(contextMenu.folderId, { name: newName.trim() });
+          }
+        }
+      });
       closeContextMenu();
     }, [contextMenu, folders, onUpdateFolder, closeContextMenu]);
 
     // Supprimer un dossier
     const handleDelete = useCallback(() => {
-      if (confirm('Supprimer ce dossier et tous ses sous-dossiers ? Les PDFs ne seront pas supprimés.')) {
-        onDeleteFolder(contextMenu.folderId);
-      }
+      setModal({
+        type: 'confirm',
+        title: 'Supprimer ce dossier et tous ses sous-dossiers ? Les PDFs ne seront pas supprimés.',
+        onConfirm: () => {
+          onDeleteFolder(contextMenu.folderId);
+        }
+      });
       closeContextMenu();
     }, [contextMenu, onDeleteFolder, closeContextMenu]);
 
@@ -133,10 +154,16 @@
       React.createElement('button', {
         className: 'btn-secondary create-root-btn',
         onClick: () => {
-          const name = prompt('Nom du nouveau dossier racine:');
-          if (name && name.trim()) {
-            onCreateFolder(name.trim(), null);
-          }
+          setModal({
+            type: 'prompt',
+            title: 'Nom du nouveau dossier racine:',
+            defaultValue: '',
+            onConfirm: (name) => {
+              if (name && name.trim()) {
+                onCreateFolder(name.trim(), null);
+              }
+            }
+          });
         }
       }, '+ Nouveau dossier'),
 
@@ -167,6 +194,46 @@
             className: 'context-menu-item delete',
             onClick: handleDelete
           }, 'Supprimer')
+        )
+      ),
+
+      // Modale
+      modal && React.createElement('div', {
+        className: 'modal-overlay',
+        onClick: () => setModal(null)
+      },
+        React.createElement('div', {
+          className: 'modal',
+          onClick: (e) => e.stopPropagation()
+        },
+          React.createElement('div', { className: 'modal-title' }, modal.title),
+          modal.type === 'prompt' && React.createElement('input', {
+            type: 'text',
+            value: modalValue,
+            onChange: (e) => setModalValue(e.target.value),
+            onKeyDown: (e) => {
+              if (e.key === 'Enter') {
+                modal.onConfirm(modalValue);
+                setModal(null);
+              } else if (e.key === 'Escape') {
+                setModal(null);
+              }
+            },
+            autoFocus: true
+          }),
+          React.createElement('div', { className: 'modal-buttons' },
+            React.createElement('button', {
+              className: 'btn-primary',
+              onClick: () => {
+                modal.onConfirm(modal.type === 'prompt' ? modalValue : undefined);
+                setModal(null);
+              }
+            }, 'OK'),
+            React.createElement('button', {
+              className: 'btn-secondary',
+              onClick: () => setModal(null)
+            }, 'Annuler')
+          )
         )
       )
     );
