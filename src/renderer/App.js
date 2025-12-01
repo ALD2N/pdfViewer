@@ -11,11 +11,14 @@
     const [currentView, setCurrentView] = useState('home'); // 'home' ou 'viewer'
     const [currentPdf, setCurrentPdf] = useState(null);
     const [config, setConfig] = useState(null);
+    const [folders, setFolders] = useState({});
+    const [expandedFolders, setExpandedFolders] = useState(new Set());
     const [loading, setLoading] = useState(true);
 
-    // Charger la configuration au démarrage
+    // Charger la configuration et les dossiers au démarrage
     useEffect(() => {
       loadConfig();
+      loadFolders();
     }, []);
 
     // Charger la configuration depuis le main process
@@ -25,6 +28,18 @@
         setConfig(cfg);
       } catch (error) {
         console.error('Erreur chargement config:', error);
+      }
+    };
+
+    // Charger les dossiers
+    const loadFolders = async () => {
+      try {
+        const result = await window.electronAPI.loadFolders();
+        if (result.success) {
+          setFolders(result.folders);
+        }
+      } catch (error) {
+        console.error('Erreur chargement dossiers:', error);
       } finally {
         setLoading(false);
       }
@@ -94,6 +109,72 @@
       }
     }, []);
 
+    // Gestion des dossiers
+    const createFolder = useCallback(async (name, parentId) => {
+      try {
+        const result = await window.electronAPI.createFolder({ name, parentId });
+        if (result.success) {
+          setFolders(result.folders);
+        } else {
+          console.error(result.error);
+        }
+      } catch (error) {
+        console.error('Erreur création dossier:', error);
+      }
+    }, []);
+
+    const updateFolder = useCallback(async (id, updates) => {
+      try {
+        const result = await window.electronAPI.updateFolder({ id, updates });
+        if (result.success) {
+          setFolders(result.folders);
+        } else {
+          console.error(result.error);
+        }
+      } catch (error) {
+        console.error('Erreur mise à jour dossier:', error);
+      }
+    }, []);
+
+    const deleteFolder = useCallback(async (id) => {
+      try {
+        const result = await window.electronAPI.deleteFolder({ id });
+        if (result.success) {
+          setFolders(result.folders);
+        } else {
+          console.error(result.error);
+        }
+      } catch (error) {
+        console.error('Erreur suppression dossier:', error);
+      }
+    }, []);
+
+    const assignPdfToFolder = useCallback(async (folderId, pdfPath) => {
+      try {
+        const result = await window.electronAPI.assignPdfToFolder({ folderId, pdfPath });
+        if (result.success) {
+          setFolders(result.folders);
+        } else {
+          console.error(result.error);
+        }
+      } catch (error) {
+        console.error('Erreur assignation PDF:', error);
+      }
+    }, []);
+
+    // Gestion de l'expansion des dossiers
+    const toggleFolderExpansion = useCallback((folderId) => {
+      setExpandedFolders(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(folderId)) {
+          newSet.delete(folderId);
+        } else {
+          newSet.add(folderId);
+        }
+        return newSet;
+      });
+    }, []);
+
     // Affichage du loading
     if (loading) {
       return React.createElement('div', { className: 'loading-overlay' },
@@ -107,9 +188,16 @@
       (currentView === 'home'
         ? React.createElement(window.HomeScreen, {
             config: config,
+            folders: folders,
+            expandedFolders: expandedFolders,
             onOpenPdf: openPdf,
             onOpenDialog: openFileDialog,
-            onRemovePdf: removePdf
+            onRemovePdf: removePdf,
+            onCreateFolder: createFolder,
+            onUpdateFolder: updateFolder,
+            onDeleteFolder: deleteFolder,
+            onAssignPdf: assignPdfToFolder,
+            onToggleExpand: toggleFolderExpansion
           })
         : React.createElement(window.PdfViewer, {
             pdfData: currentPdf,

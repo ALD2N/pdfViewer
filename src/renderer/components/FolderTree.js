@@ -1,0 +1,156 @@
+/**
+ * FolderTree.js - Arborescence des dossiers virtuels
+ * Affiche la hiérarchie des dossiers avec expansion/collapse
+ */
+
+(function() {
+  const { useState, useCallback } = React;
+
+  function FolderTree({ folders, onCreateFolder, onUpdateFolder, onDeleteFolder, onAssignPdf, expandedFolders, onToggleExpand }) {
+    // État local pour le menu contextuel
+    const [contextMenu, setContextMenu] = useState(null);
+
+    // Gérer le clic droit sur un nœud
+    const handleContextMenu = useCallback((e, folderId) => {
+      e.preventDefault();
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        folderId
+      });
+    }, []);
+
+    // Fermer le menu contextuel
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
+    }, []);
+
+    // Créer un sous-dossier
+    const handleCreateSubfolder = useCallback(() => {
+      const name = prompt('Nom du nouveau dossier:');
+      if (name && name.trim()) {
+        onCreateFolder(name.trim(), contextMenu.folderId);
+      }
+      closeContextMenu();
+    }, [contextMenu, onCreateFolder, closeContextMenu]);
+
+    // Renommer un dossier
+    const handleRename = useCallback(() => {
+      const folder = folders[contextMenu.folderId];
+      const newName = prompt('Nouveau nom:', folder.name);
+      if (newName && newName.trim() && newName.trim() !== folder.name) {
+        onUpdateFolder(contextMenu.folderId, { name: newName.trim() });
+      }
+      closeContextMenu();
+    }, [contextMenu, folders, onUpdateFolder, closeContextMenu]);
+
+    // Supprimer un dossier
+    const handleDelete = useCallback(() => {
+      if (confirm('Supprimer ce dossier et tous ses sous-dossiers ? Les PDFs ne seront pas supprimés.')) {
+        onDeleteFolder(contextMenu.folderId);
+      }
+      closeContextMenu();
+    }, [contextMenu, onDeleteFolder, closeContextMenu]);
+
+    // Gérer le drop d'un PDF
+    const handleDrop = useCallback((e, folderId) => {
+      e.preventDefault();
+      const pdfPath = e.dataTransfer.getData('text/plain');
+      if (pdfPath) {
+        onAssignPdf(folderId, pdfPath);
+      }
+    }, [onAssignPdf]);
+
+    // Gérer le drag over
+    const handleDragOver = useCallback((e) => {
+      e.preventDefault();
+    }, []);
+
+    // Rendu récursif d'un nœud
+    const renderFolderNode = useCallback((folderId) => {
+      const folder = folders[folderId];
+      if (!folder) return null;
+
+      const isExpanded = expandedFolders.has(folderId);
+      const hasChildren = folder.childrenIds && folder.childrenIds.length > 0;
+      const hasPdfs = folder.pdfPaths && folder.pdfPaths.length > 0;
+
+      return React.createElement('div', { key: folderId, className: 'folder-node' },
+        React.createElement('div', {
+          className: 'folder-header',
+          onContextMenu: (e) => handleContextMenu(e, folderId),
+          onDrop: (e) => handleDrop(e, folderId),
+          onDragOver: handleDragOver
+        },
+          hasChildren && React.createElement('span', {
+            className: `expand-icon ${isExpanded ? 'expanded' : 'collapsed'}`,
+            onClick: () => onToggleExpand(folderId)
+          }, isExpanded ? '▼' : '▶'),
+          React.createElement('span', { className: 'folder-icon' }, '📁'),
+          React.createElement('span', { className: 'folder-name' }, folder.name),
+          hasPdfs && React.createElement('span', { className: 'pdf-count' }, `(${folder.pdfPaths.length})`)
+        ),
+        isExpanded && hasChildren && React.createElement('div', { className: 'folder-children' },
+          folder.childrenIds.map(childId => renderFolderNode(childId))
+        ),
+        isExpanded && hasPdfs && React.createElement('div', { className: 'folder-pdfs' },
+          folder.pdfPaths.map(pdfPath => 
+            React.createElement('div', { key: pdfPath, className: 'folder-pdf-item' },
+              React.createElement('span', { className: 'pdf-icon-small' }, '📄'),
+              React.createElement('span', { className: 'pdf-name-small' }, pdfPath.split(/[/\\]/).pop())
+            )
+          )
+        )
+      );
+    }, [folders, expandedFolders, onToggleExpand, handleContextMenu, handleDrop, handleDragOver]);
+
+    // Obtenir les dossiers racine
+    const rootFolders = Object.keys(folders).filter(id => !folders[id].parentId);
+
+    return React.createElement('div', { className: 'folder-tree' },
+      React.createElement('h3', null, 'Dossiers'),
+      React.createElement('button', {
+        className: 'btn-secondary create-root-btn',
+        onClick: () => {
+          const name = prompt('Nom du nouveau dossier racine:');
+          if (name && name.trim()) {
+            onCreateFolder(name.trim(), null);
+          }
+        }
+      }, '+ Nouveau dossier'),
+
+      React.createElement('div', { className: 'tree-container' },
+        rootFolders.length > 0
+          ? rootFolders.map(id => renderFolderNode(id))
+          : React.createElement('div', { className: 'empty-tree' }, 'Aucun dossier')
+      ),
+
+      // Menu contextuel
+      contextMenu && React.createElement('div', {
+        className: 'context-menu-overlay',
+        onClick: closeContextMenu
+      },
+        React.createElement('div', {
+          className: 'context-menu',
+          style: { left: contextMenu.x, top: contextMenu.y }
+        },
+          React.createElement('div', {
+            className: 'context-menu-item',
+            onClick: handleCreateSubfolder
+          }, 'Créer sous-dossier'),
+          React.createElement('div', {
+            className: 'context-menu-item',
+            onClick: handleRename
+          }, 'Renommer'),
+          React.createElement('div', {
+            className: 'context-menu-item delete',
+            onClick: handleDelete
+          }, 'Supprimer')
+        )
+      )
+    );
+  }
+
+  // Exposer globalement
+  window.FolderTree = FolderTree;
+})();
