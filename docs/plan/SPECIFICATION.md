@@ -70,16 +70,16 @@ Ajout d'une fonctionnalité de recherche textuelle dans les PDFs ouverts. Permet
 
 Voir R7 à R11 dans `docs/plan/REGLES_METIER.md`.
 
-## Navigation par Scroll (molette sur barre de navigation)
+## Navigation par Scroll (molette sur l'aperçu PDF principal)
 
 ### Description
 
-Navigation rapide entre les pages d'un PDF en utilisant la molette de la souris sur la barre de navigation (.viewer-nav). Configurable via scrollSettings dans config.json : nombre de pages par cran (pagesPerWheel) et activation/désactivation (enableScrollNavigation).
+Navigation rapide entre les pages d'un PDF en utilisant la molette de la souris sur l'aperçu PDF principal (.viewer-content). Configurable via scrollSettings dans config.json : nombre de pages par cran (pagesPerWheel) et activation/désactivation (enableScrollNavigation).
 
 ### Flux fonctionnels
 
 #### Navigation par molette
-1. L'utilisateur positionne la souris sur la barre de navigation (.viewer-nav).
+1. L'utilisateur positionne la souris sur l'aperçu PDF principal (.viewer-content).
 2. Scroll vers le bas (deltaY > 0) : avance de N pages (pagesPerWheel).
 3. Scroll vers le haut (deltaY < 0) : recule de N pages.
 4. La page reste dans les limites [1, numPages] (clamp).

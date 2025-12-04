@@ -6,13 +6,13 @@ describe('Scroll Navigation E2E Tests', () => {
     });
   });
 
-  it('should open PDF and scroll on .viewer-nav changes page indicator', () => {
+  it('should open PDF and scroll on .viewer-content changes page indicator', () => {
     // Vérifier que le PDF est ouvert
     cy.get('.pdf-viewer').should('be.visible');
     cy.get('.page-info').should('contain', 'Page 1 /');
 
-    // Scroll vers le bas sur .viewer-nav
-    cy.get('.viewer-nav').trigger('wheel', { deltaY: 100 });
+    // Scroll vers le bas sur .viewer-content (aperçu PDF principal)
+    cy.get('.viewer-content').trigger('wheel', { deltaY: 100 });
 
     // Vérifier que la page a changé
     cy.get('.page-info').should('not.contain', 'Page 1 /');
@@ -26,12 +26,12 @@ describe('Scroll Navigation E2E Tests', () => {
       const match = text.match(/Page \d+ \/ (\d+)/);
       const totalPages = parseInt(match[1]);
 
-      // Scroll vers le bas (page suivante)
-      cy.get('.viewer-nav').trigger('wheel', { deltaY: 100 });
+      // Scroll vers le bas (page suivante) sur .viewer-content
+      cy.get('.viewer-content').trigger('wheel', { deltaY: 100 });
       cy.get('.page-info').should('contain', 'Page 2 /');
 
-      // Scroll vers le haut (page précédente)
-      cy.get('.viewer-nav').trigger('wheel', { deltaY: -100 });
+      // Scroll vers le haut (page précédente) sur .viewer-content
+      cy.get('.viewer-content').trigger('wheel', { deltaY: -100 });
       cy.get('.page-info').should('contain', 'Page 1 /');
     });
   });
@@ -45,17 +45,17 @@ describe('Scroll Navigation E2E Tests', () => {
       const totalPages = parseInt(match[1]);
 
       // Essayer de scroll vers le haut depuis la page 1 (devrait rester à 1)
-      cy.get('.viewer-nav').trigger('wheel', { deltaY: -100 });
+      cy.get('.viewer-content').trigger('wheel', { deltaY: -100 });
       cy.get('.page-info').should('contain', 'Page 1 /');
 
-      // Aller à la dernière page
+      // Aller à la dernière page via scroll sur .viewer-content
       for (let i = 1; i < totalPages; i++) {
-        cy.get('.viewer-nav').trigger('wheel', { deltaY: 100 });
+        cy.get('.viewer-content').trigger('wheel', { deltaY: 100 });
       }
       cy.get('.page-info').should('contain', `Page ${totalPages} /`);
 
       // Essayer de scroll vers le bas depuis la dernière page (devrait rester à la dernière)
-      cy.get('.viewer-nav').trigger('wheel', { deltaY: 100 });
+      cy.get('.viewer-content').trigger('wheel', { deltaY: 100 });
       cy.get('.page-info').should('contain', `Page ${totalPages} /`);
     });
   });
@@ -64,8 +64,8 @@ describe('Scroll Navigation E2E Tests', () => {
     cy.get('.pdf-viewer').should('be.visible');
 
     // Avec pagesPerWheel = 2 (si configuré)
-    // Scroll vers le bas devrait sauter de 2 pages
-    cy.get('.viewer-nav').trigger('wheel', { deltaY: 100 });
+    // Scroll vers le bas sur .viewer-content devrait sauter de N pages
+    cy.get('.viewer-content').trigger('wheel', { deltaY: 100 });
     cy.get('.page-info').then(($el) => {
       const text = $el.text();
       const match = text.match(/Page (\d+) \//);
@@ -73,5 +73,16 @@ describe('Scroll Navigation E2E Tests', () => {
       // Si pagesPerWheel est 2, devrait être page 3, sinon page 2
       expect(currentPage).to.be.greaterThan(1);
     });
+  });
+
+  it('should NOT trigger scroll navigation on .viewer-nav', () => {
+    cy.get('.pdf-viewer').should('be.visible');
+    cy.get('.page-info').should('contain', 'Page 1 /');
+
+    // Scroll sur .viewer-nav NE devrait PAS changer la page
+    cy.get('.viewer-nav').trigger('wheel', { deltaY: 100 });
+
+    // La page devrait rester à 1
+    cy.get('.page-info').should('contain', 'Page 1 /');
   });
 });
