@@ -96,7 +96,8 @@ class PersistenceService {
       bookmarks: typeof config.bookmarks === 'object' && config.bookmarks !== null 
         ? config.bookmarks : {},
       folders: typeof config.folders === 'object' && config.folders !== null 
-        ? config.folders : {}
+        ? config.folders : {},
+      scrollSettings: this.validateScrollSettings(config.scrollSettings)
     };
 
     // Migration de version 1.0 à 1.1 : ajouter folders vide
@@ -155,6 +156,24 @@ class PersistenceService {
     }
 
     return validated;
+  }
+
+  /**
+   * Valide les paramètres de scrollSettings
+   * @param {Object} scrollSettings - Paramètres de scroll à valider
+   * @returns {Object} - Paramètres validés
+   */
+  validateScrollSettings(scrollSettings) {
+    if (!scrollSettings || typeof scrollSettings !== 'object') {
+      return { ...DEFAULT_CONFIG.scrollSettings };
+    }
+
+    return {
+      pagesPerWheel: Math.max(1, Math.min(10, Number(scrollSettings.pagesPerWheel) || 1)),
+      enableScrollNavigation: typeof scrollSettings.enableScrollNavigation === 'boolean' 
+        ? scrollSettings.enableScrollNavigation 
+        : true
+    };
   }
 
   /**

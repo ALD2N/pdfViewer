@@ -61,7 +61,11 @@ const DEFAULT_CONFIG = {
   version: CONFIG.CONFIG_VERSION,
   recentPdfs: [],
   bookmarks: {},
-  folders: {}
+  folders: {},
+  scrollSettings: {
+    pagesPerWheel: 1,
+    enableScrollNavigation: true
+  }
 };
 
 // Export pour usage dans Node.js (main process) - CommonJS
