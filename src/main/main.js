@@ -200,7 +200,7 @@ ipcMain.handle(IPC_CHANNELS.PDF_LOAD, async (event, filePath) => {
 });
 
 /**
- * IPC: Récupérer la liste des PDFs récemment ouverts
+ * IPC: Récupérer la liste des PDFs récemment ouverts et la configuration
  */
 ipcMain.handle(IPC_CHANNELS.PDF_GET_RECENT, async () => {
   try {
@@ -220,7 +220,11 @@ ipcMain.handle(IPC_CHANNELS.PDF_GET_RECENT, async () => {
       });
     }
 
-    return { success: true, recentPdfs };
+    return { 
+      success: true, 
+      recentPdfs,
+      scrollSettings: config.scrollSettings || { pagesPerWheel: 1, enableScrollNavigation: true }
+    };
   } catch (error) {
     console.error('Erreur récupération PDFs récents:', error);
     return { success: false, error: error.message };

@@ -14,6 +14,7 @@
     const [folders, setFolders] = useState({});
     const [expandedFolders, setExpandedFolders] = useState(new Set());
     const [loading, setLoading] = useState(true);
+    const [scrollSettings, setScrollSettings] = useState({ pagesPerWheel: 1, enableScrollNavigation: true });
 
     // Charger la configuration et les dossiers au démarrage
     useEffect(() => {
@@ -26,6 +27,10 @@
       try {
         const cfg = await window.electronAPI.getRecentPdfs();
         setConfig(cfg);
+        // Charger scrollSettings depuis la config
+        if (cfg && cfg.scrollSettings) {
+          setScrollSettings(cfg.scrollSettings);
+        }
       } catch (error) {
         console.error('Erreur chargement config:', error);
       }
@@ -215,7 +220,8 @@
           })
         : React.createElement(window.PdfViewer, {
             pdfData: currentPdf,
-            onGoHome: goHome
+            onGoHome: goHome,
+            scrollConfig: scrollSettings
           }))
     );
   }
