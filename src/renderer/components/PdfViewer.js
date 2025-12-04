@@ -7,7 +7,7 @@
 (function() {
   const { useState, useRef, useEffect, useCallback } = React;
 
-  function PdfViewer({ pdfData, onGoHome }) {
+  function PdfViewer({ pdfData, onGoHome, scrollConfig: { pagesPerWheel = 1, enableScrollNavigation = true } = {} }) {
     // Refs pour le rendu
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
@@ -52,6 +52,8 @@
     const abortControllerRef = useRef(null);
     // NOUVEAU: Ref pour stocker currentPage et numPages pour les handlers d'événements
     const navigationStateRef = useRef({ currentPage: 1, numPages: 0 });
+    // NOUVEAU: Ref pour le throttle du scroll
+    const lastWheelTimeRef = useRef(0);
 
     const attachViewerContentRef = useCallback((node) => {
       viewerContentRef.current = node;
@@ -1125,6 +1127,50 @@
         document.removeEventListener('keyup', handleSelectionEnd);
       };
     }, []); // Pas de dépendances - containerRef est stable (useRef)
+
+    // === GESTIONNAIRE DE SCROLL ===
+    useEffect(() => {
+      const handleWheel = (event) => {
+        // Vérifier si la navigation par scroll est activée
+        if (!enableScrollNavigation) return;
+
+        // Vérifier que l'événement vient de .viewer-nav
+        if (!event.target.closest('.viewer-nav')) return;
+
+        // Throttle 100ms pour performance
+        const now = Date.now();
+        if (now - lastWheelTimeRef.current < 100) return;
+        lastWheelTimeRef.current = now;
+
+        // Récupérer les valeurs actuelles depuis la ref pour éviter les closures stales
+        const { currentPage, numPages } = navigationStateRef.current;
+
+        // Calculer la direction (deltaY > 0 = scroll down = page suivante)
+        const direction = event.deltaY > 0 ? 1 : -1;
+
+        // Calculer la nouvelle page avec clamp
+        const newPage = Math.max(1, Math.min(numPages, currentPage + direction * pagesPerWheel));
+
+        // preventDefault() seulement si la page change
+        if (newPage !== currentPage) {
+          event.preventDefault();
+          setCurrentPage(newPage);
+        }
+      };
+
+      // Ajouter l'event listener sur .viewer-nav
+      const viewerNav = document.querySelector('.viewer-nav');
+      if (viewerNav) {
+        viewerNav.addEventListener('wheel', handleWheel, { passive: false });
+      }
+
+      // Cleanup
+      return () => {
+        if (viewerNav) {
+          viewerNav.removeEventListener('wheel', handleWheel);
+        }
+      };
+    }, [enableScrollNavigation, pagesPerWheel]); // Dépendances pour re-attacher si config change
 
     // === RENDU ===
     return React.createElement('div', { className: 'pdf-viewer', ref: containerRef },
