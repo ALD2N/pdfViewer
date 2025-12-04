@@ -159,3 +159,25 @@ Renderer -> Main:
 1. Drop event -> IPC FOLDER_ASSIGN_PDF.
 2. Main assignPdfToFolder() -> add to pdfPaths if not present -> save.
 3. Reply success -> Renderer move PDF from orphan/recent to assigned (update lists).
+
+## Scroll Navigation (Navigation par molette)
+
+### Description
+Extension de PdfViewer.js pour naviguer entre les pages via la molette de la souris sur la barre de navigation (.viewer-nav). Configuration persistée dans config.json.
+
+### Diagramme flux
+```
+config.json (scrollSettings)
+    ↓
+main.js (PDF_GET_RECENT) → retourne scrollSettings
+    ↓
+App.js (état scrollSettings) → prop scrollConfig
+    ↓
+PdfViewer.js → wheel event sur .viewer-nav → setCurrentPage
+```
+
+### Points d'intégration clés
+- **PdfViewer.js** : useEffect avec listener `wheel` sur `.viewer-nav`, throttle 100ms, calcul direction et clamp.
+- **App.js** : Charge scrollSettings depuis config, passe à PdfViewer via prop `scrollConfig`.
+- **persistence.js** : Validation pagesPerWheel [1-10], enableScrollNavigation boolean.
+- **constants.js** : DEFAULT_CONFIG.scrollSettings avec valeurs par défaut.

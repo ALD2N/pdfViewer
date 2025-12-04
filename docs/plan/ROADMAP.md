@@ -12,6 +12,7 @@
 ## Phase 2 (version 1.1) - Évolutions mineures
 
 - Recherche textuelle dans le PDF (4 jours : implémentation SearchService.js pour logique extraction/recherche, SearchPanel.js pour UI, intégration dans PdfViewer.js pour toggle/surlignage/navigation, tests et optimisation performance).
+- Navigation par Scroll (3h : navigation par molette sur barre de nav, config pagesPerWheel, validation, tests).
 - Export des bookmarks en JSON/CSV.
 - Améliorations UX : raccourcis clavier (Ctrl+B pour bookmark).
 - Support thèmes clair/sombre switchable.
@@ -27,7 +28,7 @@
 
 - **Total** : 14 jours développeur (1 personne).
 - **MVP** : 7 jours (50% effort).
-- **Phase 2** : 5 jours (recherche 4j + autres 1j).
+- **Phase 2** : 5 jours (recherche 4j + scroll navigation 3h + autres 1j).
 - **Phase 3** : 2 jours.
 - Répartition par tâche : Voir SPECIFICATION.md.
 
