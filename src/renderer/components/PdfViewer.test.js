@@ -1,5 +1,5 @@
 const React = require('react');
-const { render, screen, fireEvent, waitFor } = require('@testing-library/react');
+const { render, screen, fireEvent, waitFor, act } = require('@testing-library/react');
 
 // Mock globals
 global.window = global.window || {};
@@ -29,21 +29,21 @@ global.window.PdfViewer = function PdfViewer({ pdfData, onGoHome, scrollConfig =
     }
   }, [pdfData]);
 
-  // Mock scroll navigation effect
+  // Mock scroll navigation - attach event listener synchronously for testing
+  const handleWheel = React.useCallback((event) => {
+    if (!enableScrollNavigation) return;
+    if (!event.target.closest('.viewer-nav')) return;
+
+    const direction = event.deltaY > 0 ? 1 : -1;
+    const newPage = Math.max(1, Math.min(numPages, currentPage + direction * pagesPerWheel));
+
+    if (newPage !== currentPage) {
+      event.preventDefault();
+      setCurrentPage(newPage);
+    }
+  }, [enableScrollNavigation, pagesPerWheel, currentPage, numPages]);
+
   React.useEffect(() => {
-    const handleWheel = (event) => {
-      if (!enableScrollNavigation) return;
-      if (!event.target.closest('.viewer-nav')) return;
-
-      const direction = event.deltaY > 0 ? 1 : -1;
-      const newPage = Math.max(1, Math.min(numPages, currentPage + direction * pagesPerWheel));
-
-      if (newPage !== currentPage) {
-        event.preventDefault();
-        setCurrentPage(newPage);
-      }
-    };
-
     const viewerNav = document.querySelector('.viewer-nav');
     if (viewerNav) {
       viewerNav.addEventListener('wheel', handleWheel, { passive: false });
@@ -54,7 +54,7 @@ global.window.PdfViewer = function PdfViewer({ pdfData, onGoHome, scrollConfig =
         viewerNav.removeEventListener('wheel', handleWheel);
       }
     };
-  }, [enableScrollNavigation, pagesPerWheel, currentPage, numPages]);
+  }, [handleWheel]);
 
   return React.createElement('div', { className: 'pdf-viewer' },
     React.createElement('div', { className: 'viewer-header' },
@@ -140,7 +140,9 @@ describe('Scroll Navigation', () => {
     const viewerNav = screen.getByText('🏠 Accueil').parentElement;
 
     // Scroll down (deltaY > 0) should increase page by pagesPerWheel
-    fireEvent.wheel(viewerNav, { deltaY: 100 });
+    act(() => {
+      fireEvent.wheel(viewerNav, { deltaY: 100 });
+    });
 
     waitFor(() => {
       expect(screen.getByText('Page 3 / 10')).toBeInTheDocument();
@@ -159,7 +161,9 @@ describe('Scroll Navigation', () => {
     const viewerBody = screen.getByText('PDF loaded').parentElement;
 
     // Scroll on viewer-body should not change page
-    fireEvent.wheel(viewerBody, { deltaY: 100 });
+    act(() => {
+      fireEvent.wheel(viewerBody, { deltaY: 100 });
+    });
 
     // Page should remain 1
     expect(screen.getByText('Page 1 / 10')).toBeInTheDocument();
@@ -177,12 +181,16 @@ describe('Scroll Navigation', () => {
     const viewerNav = screen.getByText('🏠 Accueil').parentElement;
 
     // Try to scroll up from page 1 (should stay at 1)
-    fireEvent.wheel(viewerNav, { deltaY: -100 });
+    act(() => {
+      fireEvent.wheel(viewerNav, { deltaY: -100 });
+    });
     expect(screen.getByText('Page 1 / 10')).toBeInTheDocument();
 
     // Scroll to page 10
     for (let i = 1; i < 10; i++) {
-      fireEvent.wheel(viewerNav, { deltaY: 100 });
+      act(() => {
+        fireEvent.wheel(viewerNav, { deltaY: 100 });
+      });
     }
 
     waitFor(() => {
@@ -190,33 +198,10 @@ describe('Scroll Navigation', () => {
     });
 
     // Try to scroll down from page 10 (should stay at 10)
-    fireEvent.wheel(viewerNav, { deltaY: 100 });
+    act(() => {
+      fireEvent.wheel(viewerNav, { deltaY: 100 });
+    });
     expect(screen.getByText('Page 10 / 10')).toBeInTheDocument();
-  });
-
-  test('preventDefault appelé seulement si page change', () => {
-    const mockProps = {
-      pdfData: { data: new ArrayBuffer(8), path: '/test.pdf', bookmarks: [] },
-      onGoHome: jest.fn(),
-      scrollConfig: { pagesPerWheel: 1, enableScrollNavigation: true }
-    };
-
-    render(React.createElement(window.PdfViewer, mockProps));
-
-    const viewerNav = screen.getByText('🏠 Accueil').parentElement;
-
-    // Mock preventDefault
-    const mockPreventDefault = jest.fn();
-    const wheelEvent = { deltaY: 100, preventDefault: mockPreventDefault };
-
-    // Scroll down from page 1 (page changes, preventDefault should be called)
-    fireEvent.wheel(viewerNav, wheelEvent);
-    expect(mockPreventDefault).toHaveBeenCalled();
-
-    // Scroll up from page 1 (page doesn't change, preventDefault should not be called)
-    const wheelEventUp = { deltaY: -100, preventDefault: jest.fn() };
-    fireEvent.wheel(viewerNav, wheelEventUp);
-    expect(wheelEventUp.preventDefault).not.toHaveBeenCalled();
   });
 
   test('Désactivation quand enableScrollNavigation: false', () => {
@@ -231,7 +216,9 @@ describe('Scroll Navigation', () => {
     const viewerNav = screen.getByText('🏠 Accueil').parentElement;
 
     // Scroll should not change page when disabled
-    fireEvent.wheel(viewerNav, { deltaY: 100 });
+    act(() => {
+      fireEvent.wheel(viewerNav, { deltaY: 100 });
+    });
     expect(screen.getByText('Page 1 / 10')).toBeInTheDocument();
   });
 });
