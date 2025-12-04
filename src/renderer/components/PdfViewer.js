@@ -1134,8 +1134,8 @@
         // Vérifier si la navigation par scroll est activée
         if (!enableScrollNavigation) return;
 
-        // Vérifier que l'événement vient de .viewer-nav
-        if (!event.target.closest('.viewer-nav')) return;
+        // Vérifier que l'événement vient de .viewer-content
+        if (!event.target.closest('.viewer-content')) return;
 
         // Throttle 100ms pour performance
         const now = Date.now();
@@ -1158,16 +1158,17 @@
         }
       };
 
-      // Ajouter l'event listener sur .viewer-nav
-      const viewerNav = document.querySelector('.viewer-nav');
-      if (viewerNav) {
-        viewerNav.addEventListener('wheel', handleWheel, { passive: false });
+      // Ajouter l'event listener sur .viewer-content
+      const viewerContent = document.querySelector('.viewer-content');
+      if (viewerContent) {
+        viewerContent.addEventListener('wheel', handleWheel, { passive: false });
       }
 
       // Cleanup
       return () => {
-        if (viewerNav) {
-          viewerNav.removeEventListener('wheel', handleWheel);
+        const viewerContentEl = document.querySelector('.viewer-content');
+        if (viewerContentEl) {
+          viewerContentEl.removeEventListener('wheel', handleWheel);
         }
       };
     }, [enableScrollNavigation, pagesPerWheel]); // Dépendances pour re-attacher si config change

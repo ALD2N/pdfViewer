@@ -2,17 +2,17 @@
 
 ## Vue d'ensemble de la feature
 
-La fonctionnalité "Scroll Navigation" permet de naviguer rapidement entre les pages d'un PDF en utilisant la molette de la souris sur la barre de navigation (.viewer-nav). Cette méthode de navigation est plus fluide que les clics sur les boutons précédent/suivant, et permet de parcourir plusieurs pages d'un coup via le paramètre `pagesPerWheel`.
+La fonctionnalité "Scroll Navigation" permet de naviguer rapidement entre les pages d'un PDF en utilisant la molette de la souris sur l'aperçu PDF principal (.viewer-content). Cette méthode de navigation est plus fluide que les clics sur les boutons précédent/suivant, et permet de parcourir plusieurs pages d'un coup via le paramètre `pagesPerWheel`.
 
 ## User stories associées
 
-- **US18** : En tant qu'utilisateur, je veux pouvoir naviguer entre les pages en utilisant la molette de la souris sur la barre de navigation, afin de parcourir rapidement un document sans clics répétés.
+- **US18** : En tant qu'utilisateur, je veux pouvoir naviguer entre les pages en utilisant la molette de la souris sur l'aperçu PDF principal, afin de parcourir rapidement un document sans clics répétés.
 - **US19** : En tant qu'utilisateur, je veux configurer le nombre de pages à sauter par cran de molette (pagesPerWheel), afin d'adapter la vitesse de navigation à mes besoins.
 - **US20** : En tant qu'utilisateur, je veux pouvoir désactiver la navigation par molette si je préfère les boutons traditionnels.
 
 ## Règles métier
 
-- **R21** : La navigation par molette est active uniquement sur l'élément `.viewer-nav` (barre de navigation principale).
+- **R21** : La navigation par molette est active uniquement sur l'élément `.viewer-content` (aperçu PDF principal).
 - **R22** : Scroll vers le bas (deltaY > 0) = page suivante (+N pages).
 - **R23** : Scroll vers le haut (deltaY < 0) = page précédente (-N pages).
 - **R24** : Le nombre de pages sautées par cran est configurable via `pagesPerWheel` (défaut: 1, min: 1, max: 10).
@@ -47,7 +47,7 @@ La fonctionnalité "Scroll Navigation" permet de naviguer rapidement entre les p
 
 ### Cas d'usage 1 : Navigation rapide
 **Avant :** L'utilisateur clique plusieurs fois sur le bouton "suivant" pour parcourir 10 pages.
-**Après :** L'utilisateur positionne la souris sur la barre de navigation et utilise la molette ; avec pagesPerWheel=2, 5 crans suffisent pour avancer de 10 pages.
+**Après :** L'utilisateur positionne la souris sur l'aperçu PDF et utilise la molette ; avec pagesPerWheel=2, 5 crans suffisent pour avancer de 10 pages.
 
 ### Cas d'usage 2 : Navigation précise
 **Configuration :** pagesPerWheel=1 (défaut).
@@ -59,12 +59,12 @@ La fonctionnalité "Scroll Navigation" permet de naviguer rapidement entre les p
 
 ### Cas d'usage 4 : Désactivation
 **Configuration :** enableScrollNavigation=false.
-**Usage :** L'utilisateur préfère utiliser uniquement les boutons ou le clavier ; la molette n'a pas d'effet sur .viewer-nav.
+**Usage :** L'utilisateur préfère utiliser uniquement les boutons ou le clavier ; la molette n'a pas d'effet sur .viewer-content.
 
 ## Implémentation technique
 
 ### PdfViewer.js
-- Événement `wheel` écouté sur `.viewer-nav` avec `{ passive: false }`.
+- Événement `wheel` écouté sur `.viewer-content` avec `{ passive: false }`.
 - Utilisation de `navigationStateRef` pour accéder aux valeurs actuelles (currentPage, numPages) sans problèmes de closure stale.
 - Throttle via `lastWheelTimeRef` (100ms minimum entre navigations).
 - `preventDefault()` appelé uniquement si la page change.

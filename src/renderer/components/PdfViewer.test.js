@@ -32,7 +32,7 @@ global.window.PdfViewer = function PdfViewer({ pdfData, onGoHome, scrollConfig =
   // Mock scroll navigation - attach event listener synchronously for testing
   const handleWheel = React.useCallback((event) => {
     if (!enableScrollNavigation) return;
-    if (!event.target.closest('.viewer-nav')) return;
+    if (!event.target.closest('.viewer-content')) return;
 
     const direction = event.deltaY > 0 ? 1 : -1;
     const newPage = Math.max(1, Math.min(numPages, currentPage + direction * pagesPerWheel));
@@ -44,14 +44,15 @@ global.window.PdfViewer = function PdfViewer({ pdfData, onGoHome, scrollConfig =
   }, [enableScrollNavigation, pagesPerWheel, currentPage, numPages]);
 
   React.useEffect(() => {
-    const viewerNav = document.querySelector('.viewer-nav');
-    if (viewerNav) {
-      viewerNav.addEventListener('wheel', handleWheel, { passive: false });
+    const viewerContent = document.querySelector('.viewer-content');
+    if (viewerContent) {
+      viewerContent.addEventListener('wheel', handleWheel, { passive: false });
     }
 
     return () => {
-      if (viewerNav) {
-        viewerNav.removeEventListener('wheel', handleWheel);
+      const viewerContentEl = document.querySelector('.viewer-content');
+      if (viewerContentEl) {
+        viewerContentEl.removeEventListener('wheel', handleWheel);
       }
     };
   }, [handleWheel]);
@@ -66,9 +67,11 @@ global.window.PdfViewer = function PdfViewer({ pdfData, onGoHome, scrollConfig =
       )
     ),
     React.createElement('div', { className: 'viewer-body' },
-      pdfData ? React.createElement('div', null, 'PDF loaded') : React.createElement('div', { className: 'loading-overlay' },
-        React.createElement('div', { className: 'spinner' }),
-        React.createElement('p', null, 'Chargement du PDF...'))
+      React.createElement('div', { className: 'viewer-content' },
+        pdfData ? React.createElement('div', null, 'PDF loaded') : React.createElement('div', { className: 'loading-overlay' },
+          React.createElement('div', { className: 'spinner' }),
+          React.createElement('p', null, 'Chargement du PDF...'))
+      )
     )
   );
 };
@@ -128,7 +131,7 @@ describe('Scroll Navigation', () => {
     jest.clearAllMocks();
   });
 
-  test('Scroll sur .viewer-nav change la page de +N (pagesPerWheel)', () => {
+  test('Scroll sur .viewer-content change la page de +N (pagesPerWheel)', () => {
     const mockProps = {
       pdfData: { data: new ArrayBuffer(8), path: '/test.pdf', bookmarks: [] },
       onGoHome: jest.fn(),
@@ -137,11 +140,11 @@ describe('Scroll Navigation', () => {
 
     render(React.createElement(window.PdfViewer, mockProps));
 
-    const viewerNav = screen.getByText('🏠 Accueil').parentElement;
+    const viewerContent = screen.getByText('PDF loaded');
 
     // Scroll down (deltaY > 0) should increase page by pagesPerWheel
     act(() => {
-      fireEvent.wheel(viewerNav, { deltaY: 100 });
+      fireEvent.wheel(viewerContent, { deltaY: 100 });
     });
 
     waitFor(() => {
@@ -149,7 +152,7 @@ describe('Scroll Navigation', () => {
     });
   });
 
-  test('Scroll hors .viewer-nav ne change pas la page', () => {
+  test('Scroll hors .viewer-content ne change pas la page', () => {
     const mockProps = {
       pdfData: { data: new ArrayBuffer(8), path: '/test.pdf', bookmarks: [] },
       onGoHome: jest.fn(),
@@ -158,11 +161,11 @@ describe('Scroll Navigation', () => {
 
     render(React.createElement(window.PdfViewer, mockProps));
 
-    const viewerBody = screen.getByText('PDF loaded').parentElement;
+    const viewerNav = screen.getByText('🏠 Accueil').parentElement;
 
-    // Scroll on viewer-body should not change page
+    // Scroll on viewer-nav should not change page
     act(() => {
-      fireEvent.wheel(viewerBody, { deltaY: 100 });
+      fireEvent.wheel(viewerNav, { deltaY: 100 });
     });
 
     // Page should remain 1
@@ -178,18 +181,18 @@ describe('Scroll Navigation', () => {
 
     render(React.createElement(window.PdfViewer, mockProps));
 
-    const viewerNav = screen.getByText('🏠 Accueil').parentElement;
+    const viewerContent = screen.getByText('PDF loaded');
 
     // Try to scroll up from page 1 (should stay at 1)
     act(() => {
-      fireEvent.wheel(viewerNav, { deltaY: -100 });
+      fireEvent.wheel(viewerContent, { deltaY: -100 });
     });
     expect(screen.getByText('Page 1 / 10')).toBeInTheDocument();
 
     // Scroll to page 10
     for (let i = 1; i < 10; i++) {
       act(() => {
-        fireEvent.wheel(viewerNav, { deltaY: 100 });
+        fireEvent.wheel(viewerContent, { deltaY: 100 });
       });
     }
 
@@ -199,7 +202,7 @@ describe('Scroll Navigation', () => {
 
     // Try to scroll down from page 10 (should stay at 10)
     act(() => {
-      fireEvent.wheel(viewerNav, { deltaY: 100 });
+      fireEvent.wheel(viewerContent, { deltaY: 100 });
     });
     expect(screen.getByText('Page 10 / 10')).toBeInTheDocument();
   });
@@ -213,11 +216,11 @@ describe('Scroll Navigation', () => {
 
     render(React.createElement(window.PdfViewer, mockProps));
 
-    const viewerNav = screen.getByText('🏠 Accueil').parentElement;
+    const viewerContent = screen.getByText('PDF loaded');
 
     // Scroll should not change page when disabled
     act(() => {
-      fireEvent.wheel(viewerNav, { deltaY: 100 });
+      fireEvent.wheel(viewerContent, { deltaY: 100 });
     });
     expect(screen.getByText('Page 1 / 10')).toBeInTheDocument();
   });
